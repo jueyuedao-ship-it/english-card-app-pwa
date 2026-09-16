@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>英単語単語帳（モバイル）</title>
+<meta name="theme-color" content="#667eea">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="英単語帳">
+<link rel="manifest" href="./manifest.webmanifest">
+<link rel="icon" href="./icon-192.png" sizes="192x192">
+<link rel="apple-touch-icon" href="./icon-192.png">
+<link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+<div class="header">
+  <h1>英単語単語帳</h1>
+  <div class="progress-bar">
+    <span class="progress-info" id="progressInfo"></span>
+    <button class="btn-small" onclick="exportProgress()">エクスポート</button>
+    <button class="btn-small" onclick="document.getElementById('importFile').click()">インポート</button>
+    <input type="file" id="importFile" accept=".json" style="display:none" onchange="importProgress(event)">
+  </div>
+</div>
+<div class="tabs">
+  <button class="tab active" data-tab="flashcard" onclick="switchTab('flashcard')">フラッシュカード</button>
+  <button class="tab" data-tab="quiz" onclick="switchTab('quiz')">4択クイズ</button>
+  <button class="tab" data-tab="list" onclick="switchTab('list')">全単語リスト</button>
+</div>
+
+<!-- Flashcard -->
+<div class="mode-panel active" id="panel-flashcard">
+  <div class="page-filter" id="flashcardPageFilter">
+    <div class="page-filter-title">表示するページを選択</div>
+    <div class="page-filter-btns">
+      <button class="filter-btn" onclick="selectAllPages('flashcard')">全ページ</button>
+      <button class="filter-btn" onclick="deselectAllPages('flashcard')">選択解除</button>
+      <button class="filter-btn" onclick="clearAllPageFilters()">全ページクリア</button>
+    </div>
+    <div class="page-filter-grid" id="flashcardPageGrid"></div>
+  </div>
+  <button class="page-filter-btn" onclick="togglePageFilter('flashcard')">ページ選択</button>
+  <div class="card-area">
+    <div class="card" id="flashcard" onclick="flipCard()">
+      <div class="card-word" id="flashcardWord"></div>
+      <div class="card-meaning" id="flashcardMeaning"></div>
+      <div class="card-page" id="flashcardPage"></div>
+      <div class="card-hint">クリックして裏返し</div>
+    </div>
+    <div class="card-stats" id="flashcardStats"></div>
+    <div class="card-modes">
+      <button class="btn btn-secondary shuffle-btn" id="shuffleBtn" onclick="toggleShuffle()">シャッフル</button>
+      <button class="btn btn-secondary shuffle-btn" id="pageOrderBtn" onclick="togglePageOrder()">ページ順</button>
+    </div>
+    <div class="card-controls">
+      <button class="btn btn-unknown" onclick="markCard(false)">知っていなかった</button>
+      <button class="btn btn-known" onclick="markCard(true)">知っていた</button>
+    </div>
+  </div>
+</div>
+
+<!-- Quiz -->
+<div class="mode-panel" id="panel-quiz">
+  <div class="page-filter" id="quizPageFilter">
+    <div class="page-filter-title">表示するページを選択</div>
+    <div class="page-filter-btns">
+      <button class="filter-btn" onclick="selectAllPages('quiz')">全ページ</button>
+      <button class="filter-btn" onclick="deselectAllPages('quiz')">選択解除</button>
+      <button class="filter-btn" onclick="clearAllPageFilters()">全ページクリア</button>
+    </div>
+    <div class="page-filter-grid" id="quizPageGrid"></div>
+  </div>
+  <button class="page-filter-btn" onclick="togglePageFilter('quiz')">ページ選択</button>
+  <div class="quiz-mode-toggle">
+    <button class="filter-btn" id="quizModeBtn" onclick="toggleQuizMode()">英→和</button>
+    <button class="filter-btn" id="quizShuffleBtn" onclick="toggleQuizShuffle()">シャッフル</button>
+    <button class="filter-btn" id="quizPageOrderBtn" onclick="toggleQuizPageOrder()">ページ順</button>
+  </div>
+  <div class="quiz-area">
+    <div class="quiz-score">正解: <span id="quizScore">0</span> / <span id="quizTotal">0</span></div>
+    <div class="quiz-question">
+      <div class="quiz-word" id="quizWord"></div>
+    </div>
+    <div class="quiz-options" id="quizOptions"></div>
+    <div class="quiz-result" id="quizResult"></div>
+  </div>
+</div>
+
+<!-- List -->
+<div class="mode-panel" id="panel-list">
+  <div class="page-filter" id="listPageFilter">
+    <div class="page-filter-title">表示するページを選択</div>
+    <div class="page-filter-btns">
+      <button class="filter-btn" onclick="selectAllPages('list')">全ページ</button>
+      <button class="filter-btn" onclick="deselectAllPages('list')">選択解除</button>
+      <button class="filter-btn" onclick="clearAllPageFilters()">全ページクリア</button>
+    </div>
+    <div class="page-filter-grid" id="listPageGrid"></div>
+  </div>
+  <button class="page-filter-btn" onclick="togglePageFilter('list')">ページ選択</button>
+  <div class="list-toolbar">
+    <input class="search-input" type="text" id="searchInput" placeholder="英単語・和訳で検索..." oninput="filterList()">
+    <button class="filter-btn active" onclick="setFilter('all', this)">全部</button>
+    <button class="filter-btn" onclick="setFilter('done', this)">完璧済</button>
+    <button class="filter-btn" onclick="setFilter('undone', this)">未完璧</button>
+  </div>
+  <div class="list-stats" id="listStats"></div>
+  <div class="table-wrapper">
+    <table class="word-table" id="wordTable">
+      <thead><tr><th>英単語</th><th>和訳</th><th>ページ</th><th>完璧</th></tr></thead>
+      <tbody id="wordTableBody"></tbody>
+    </table>
+  </div>
+</div>
+
+<script src="./app.js"></script>
+<script src="./pwa.js"></script>
+</body>
+</html>
