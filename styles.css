@@ -190,8 +190,8 @@ body { font-family: 'Hiragino Sans', 'Hiragino Kaku Gothic ProN', 'Noto Sans JP'
 }
 
 
-/* TOEIC list: CEFR + priority filters */
-.toeic-mode #listPageGrid.toeic-list-filter-grid {
+/* TOEIC: CEFR + priority filters */
+.toeic-mode .page-filter-grid.toeic-priority-filter-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 8px;
@@ -234,7 +234,7 @@ body { font-family: 'Hiragino Sans', 'Hiragino Kaku Gothic ProN', 'Noto Sans JP'
 }
 
 @media (max-width: 640px) {
-  .toeic-mode #listPageGrid.toeic-list-filter-grid {
+  .toeic-mode .page-filter-grid.toeic-priority-filter-grid {
     grid-template-columns: 1fr;
   }
 
