@@ -14,6 +14,18 @@
 <link rel="stylesheet" href="./styles.css">
 </head>
 <body>
+<section class="study-mode-chooser" id="studyModeChooser" hidden>
+  <div class="study-mode-card">
+    <h1>学習モードを選択</h1>
+    <p>使用する英単語セットを選んでください。</p>
+    <div class="study-mode-options">
+      <button class="study-mode-option" onclick="chooseStudyMode('kosen')"><strong>高専用</strong><span>従来の498語</span></button>
+      <button class="study-mode-option" onclick="chooseStudyMode('toeic')"><strong>TOEIC Bridge対策</strong><span>CEFR A1〜B1・5,021項目</span></button>
+    </div>
+    <p class="study-mode-error" id="studyModeError"></p>
+  </div>
+</section>
+<div id="appShell" hidden>
 <div class="header">
   <h1>英単語単語帳</h1>
   <div class="progress-bar">
@@ -114,7 +126,9 @@
   </div>
 </div>
 
+</div>
 <script src="./app.js"></script>
+<script src="./toeic-mode.js"></script>
 <script src="./pwa.js"></script>
 </body>
 </html>
