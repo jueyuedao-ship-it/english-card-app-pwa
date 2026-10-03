@@ -310,15 +310,12 @@
       wordCell.textContent = item.word;
 
       const meaningCell = document.createElement('td');
-      meaningCell.className = 'meaning-cell';
       meaningCell.textContent = item.meaning;
 
       const levelCell = document.createElement('td');
-      levelCell.className = 'level-cell';
       levelCell.textContent = `${item.cefr} / ${item.priority}`;
 
       const masteryCell = document.createElement('td');
-      masteryCell.className = 'mastery-cell';
       const toggle = document.createElement('span');
       toggle.className = 'mastery-toggle ' + (done ? 'done' : '');
       toggle.textContent = done ? '★' : '☆';
@@ -376,8 +373,6 @@
   }
 
   function setToeicLabels() {
-    document.body.classList.add('toeic-mode');
-    document.body.classList.remove('kosen-mode');
     document.querySelector('.header h1').textContent = '英単語単語帳 - TOEIC Bridge対策';
 
     document.querySelectorAll('.page-filter-title').forEach(el => {
@@ -457,8 +452,6 @@
   }
 
   function setKosenLabels() {
-    document.body.classList.add('kosen-mode');
-    document.body.classList.remove('toeic-mode');
     document.querySelector('.header h1').textContent = '英単語単語帳';
 
     document.querySelectorAll('.page-filter-title').forEach(el => {
@@ -502,7 +495,6 @@
   }
 
   function showChooser(errorMessage = '') {
-    document.body.classList.remove('toeic-mode', 'kosen-mode');
     document.getElementById('appShell').hidden = true;
     const chooser = document.getElementById('studyModeChooser');
     chooser.hidden = false;

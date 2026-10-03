@@ -1,5 +1,5 @@
 const CACHE_PREFIX = 'english-vocab-pwa-';
-const CACHE_NAME = CACHE_PREFIX + 'v5';
+const CACHE_NAME = CACHE_PREFIX + 'v4';
 const APP_SHELL = [
   './',
   './index.html',
