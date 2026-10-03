@@ -15,14 +15,30 @@
 </head>
 <body>
 <section class="study-mode-chooser" id="studyModeChooser" hidden>
-  <div class="study-mode-card">
-    <h1>学習モードを選択</h1>
-    <p>使用する英単語セットを選んでください。</p>
-    <div class="study-mode-options">
-      <button class="study-mode-option" onclick="chooseStudyMode('kosen')"><strong>高専用</strong><span>従来の498語</span></button>
-      <button class="study-mode-option" onclick="chooseStudyMode('toeic')"><strong>TOEIC Bridge対策</strong><span>CEFR A1〜B1・5,021項目</span></button>
+  <div class="study-mode-home">
+    <div class="study-mode-header">
+      <h1>英単語単語帳</h1>
+      <span>学習する単語セットを選択</span>
     </div>
-    <p class="study-mode-error" id="studyModeError"></p>
+    <div class="study-mode-body">
+      <div class="study-mode-intro">
+        <h2>学習モード</h2>
+        <p>学習したい英単語帳を選んでください。進捗はモードごとに保存されます。</p>
+      </div>
+      <div class="study-mode-options">
+        <button class="study-mode-option" onclick="chooseStudyMode('kosen')">
+          <span class="study-mode-option-label">高専用</span>
+          <span class="study-mode-option-meta">高専で学ぶ英単語・498語</span>
+          <span class="study-mode-option-action">この単語帳を開く</span>
+        </button>
+        <button class="study-mode-option" onclick="chooseStudyMode('toeic')">
+          <span class="study-mode-option-label">TOEIC Bridge対策</span>
+          <span class="study-mode-option-meta">CEFR A1〜B1・5,021項目</span>
+          <span class="study-mode-option-action">この単語帳を開く</span>
+        </button>
+      </div>
+      <p class="study-mode-error" id="studyModeError"></p>
+    </div>
   </div>
 </section>
 <div id="appShell" hidden>
@@ -30,6 +46,7 @@
   <h1>英単語単語帳</h1>
   <div class="progress-bar">
     <span class="progress-info" id="progressInfo"></span>
+    <button class="btn-small" onclick="returnToStudyModeHome()">ホーム</button>
     <button class="btn-small" onclick="exportProgress()">エクスポート</button>
     <button class="btn-small" onclick="document.getElementById('importFile').click()">インポート</button>
     <input type="file" id="importFile" accept=".json" style="display:none" onchange="importProgress(event)">
