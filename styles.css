@@ -156,15 +156,31 @@ body { font-family: 'Hiragino Sans', 'Hiragino Kaku Gothic ProN', 'Noto Sans JP'
   }
 
   .toeic-mode .word-table {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
     table-layout: fixed;
-    min-width: 560px;
+  }
+
+  .toeic-mode .word-table th,
+  .toeic-mode .word-table td {
+    min-width: 0;
+    padding: 7px 6px;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    word-break: break-word;
   }
 
   .toeic-mode .word-table th:nth-child(1),
-  .toeic-mode .word-table td:nth-child(1) { width: 22%; }
+  .toeic-mode .word-table td:nth-child(1) { width: 23%; }
 
   .toeic-mode .word-table th:nth-child(2),
-  .toeic-mode .word-table td:nth-child(2) { width: 48%; }
+  .toeic-mode .word-table td:nth-child(2) {
+    width: 47%;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+  }
 
   .toeic-mode .word-table th:nth-child(3),
   .toeic-mode .word-table td:nth-child(3) { width: 20%; }
