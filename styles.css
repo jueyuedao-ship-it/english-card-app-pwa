@@ -83,3 +83,20 @@ body { font-family: 'Hiragino Sans', 'Hiragino Kaku Gothic ProN', 'Noto Sans JP'
 .mastery-toggle.done { color: #51cf66; }
 .table-wrapper { padding: 0 12px 12px; overflow-x: auto; }
 .card-modes { display: flex; gap: 8px; justify-content: center; margin-top: 8px; }
+
+
+/* Study mode chooser */
+.study-mode-chooser { min-height: 100vh; display: grid; place-items: center; padding: 24px; background: #f0f2f5; }
+.study-mode-chooser[hidden] { display: none; }
+.study-mode-card { width: min(560px, 100%); background: #fff; border-radius: 16px; padding: 28px 20px; box-shadow: 0 8px 32px rgba(0,0,0,.12); text-align: center; }
+.study-mode-card h1 { font-size: 1.5rem; margin-bottom: 8px; }
+.study-mode-card > p { color: #666; margin-bottom: 20px; }
+.study-mode-options { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 12px; }
+.study-mode-option { min-height: 120px; border: 2px solid #e0e0e0; border-radius: 14px; background: #fff; cursor: pointer; padding: 18px 12px; display: flex; flex-direction: column; justify-content: center; gap: 8px; font: inherit; }
+.study-mode-option:hover,.study-mode-option:focus-visible { border-color: #667eea; background: #f8f8ff; outline: none; }
+.study-mode-option strong { font-size: 1.12rem; color: #2d3436; }
+.study-mode-option span { font-size: .88rem; color: #777; }
+.study-mode-option:disabled { opacity: .55; cursor: wait; }
+.study-mode-error { min-height: 1.4em; margin: 14px 0 0 !important; color: #c92a2a !important; font-size: .9rem; }
+#appShell[hidden] { display: none; }
+@media (max-width: 520px) { .study-mode-options { grid-template-columns: 1fr; } }
