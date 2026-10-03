@@ -15,6 +15,12 @@
   const PAGE_TO_CEFR = { 1: 'A1', 2: 'A2', 3: 'B1' };
   const TOEIC_PRIORITIES = ['S+', 'S', 'A', 'B', 'C'];
   const TOEIC_LIST_FILTER_KEY = TOEIC_PREFIX + 'list_cefr_priority_filter_v1';
+
+  function getToeicFilterStorageKey(key) {
+    return key === 'list'
+      ? TOEIC_LIST_FILTER_KEY
+      : TOEIC_PREFIX + key + '_cefr_priority_filter_v1';
+  }
   const KOSEN_WORDS = WORD_DATA.words.map(item => ({ ...item }));
   let TOEIC_ROWS_CACHE = null;
 
@@ -30,6 +36,7 @@
     selectAllPages,
     deselectAllPages,
     clearAllPageFilters,
+    getFilteredWords,
     getWrongAnswers,
     updateProgressInfo,
     toggleShuffle,
@@ -97,8 +104,8 @@
     localStorage.setItem(TOEIC_PREFIX + 'unknown', JSON.stringify([...unknown]));
   };
 
-  function getDefaultToeicListFilter() {
-    const selectedPages = getPageFilter('list');
+  function getDefaultToeicFilter(key) {
+    const selectedPages = getPageFilter(key);
     const filter = {};
 
     Object.entries(PAGE_TO_CEFR).forEach(([page, cefr]) => {
@@ -109,9 +116,9 @@
     return filter;
   }
 
-  function getToeicListFilter() {
-    const saved = localStorage.getItem(TOEIC_LIST_FILTER_KEY);
-    if (!saved) return getDefaultToeicListFilter();
+  function getToeicFilter(key) {
+    const saved = localStorage.getItem(getToeicFilterStorageKey(key));
+    if (!saved) return getDefaultToeicFilter(key);
 
     try {
       const parsed = JSON.parse(saved);
@@ -122,21 +129,21 @@
       });
       return filter;
     } catch {
-      return getDefaultToeicListFilter();
+      return getDefaultToeicFilter(key);
     }
   }
 
-  function setToeicListFilter(filter) {
-    localStorage.setItem(TOEIC_LIST_FILTER_KEY, JSON.stringify(filter));
+  function setToeicFilter(key, filter) {
+    localStorage.setItem(getToeicFilterStorageKey(key), JSON.stringify(filter));
 
     const selectedPages = Object.entries(PAGE_TO_CEFR)
       .filter(([, cefr]) => (filter[cefr] || []).length > 0)
       .map(([page]) => Number(page));
 
-    setPageFilter('list', selectedPages);
+    setPageFilter(key, selectedPages);
   }
 
-  function syncToeicListLevelToggle(group) {
+  function syncToeicLevelToggle(group) {
     const levelToggle = group.querySelector('.toeic-level-toggle');
     const priorities = [...group.querySelectorAll('.toeic-priority-toggle')];
     const checkedCount = priorities.filter(input => input.checked).length;
@@ -145,8 +152,8 @@
     levelToggle.indeterminate = checkedCount > 0 && checkedCount < priorities.length;
   }
 
-  function saveToeicListFilterFromUi() {
-    const grid = document.getElementById('listPageGrid');
+  function saveToeicFilterFromUi(key) {
+    const grid = document.getElementById(key + 'PageGrid');
     if (!grid) return;
 
     const filter = {};
@@ -155,14 +162,14 @@
         .map(input => input.value);
     });
 
-    setToeicListFilter(filter);
-    renderList();
+    setToeicFilter(key, filter);
+    switchTab(state.currentTab);
   }
 
-  function setupToeicListFilter(grid) {
-    const filter = getToeicListFilter();
+  function setupToeicPriorityFilter(key, grid) {
+    const filter = getToeicFilter(key);
     grid.innerHTML = '';
-    grid.classList.add('toeic-list-filter-grid');
+    grid.classList.add('toeic-priority-filter-grid');
 
     Object.values(PAGE_TO_CEFR).forEach(cefr => {
       const group = document.createElement('div');
@@ -197,8 +204,8 @@
         checkbox.value = priority;
         checkbox.checked = (filter[cefr] || []).includes(priority);
         checkbox.addEventListener('change', () => {
-          syncToeicListLevelToggle(group);
-          saveToeicListFilterFromUi();
+          syncToeicLevelToggle(group);
+          saveToeicFilterFromUi(key);
         });
 
         label.appendChild(checkbox);
@@ -214,10 +221,10 @@
           input.checked = levelToggle.checked;
         });
         levelToggle.indeterminate = false;
-        saveToeicListFilterFromUi();
+        saveToeicFilterFromUi(key);
       });
 
-      syncToeicListLevelToggle(group);
+      syncToeicLevelToggle(group);
     });
   }
 
@@ -226,67 +233,54 @@
 
     const grid = document.getElementById(key + 'PageGrid');
     if (!grid) return;
-
-    if (key === 'list') {
-      setupToeicListFilter(grid);
-      return;
-    }
-
-    grid.classList.remove('toeic-list-filter-grid');
-    const pages = getUniquePages();
-    const selected = getPageFilter(key);
-    grid.innerHTML = '';
-
-    pages.forEach(page => {
-      const label = document.createElement('label');
-      label.className = 'page-filter-item';
-
-      const checkbox = document.createElement('input');
-      checkbox.type = 'checkbox';
-      checkbox.value = page;
-      checkbox.checked = selected === null || selected.includes(page);
-      checkbox.addEventListener('change', () => savePageFilter(key));
-
-      label.appendChild(checkbox);
-      label.appendChild(document.createTextNode(PAGE_TO_CEFR[page] || String(page)));
-      grid.appendChild(label);
-    });
+    setupToeicPriorityFilter(key, grid);
   };
 
   savePageFilter = function(key) {
-    if (!isToeicMode() || key !== 'list') return original.savePageFilter(key);
-    saveToeicListFilterFromUi();
+    if (!isToeicMode()) return original.savePageFilter(key);
+    saveToeicFilterFromUi(key);
   };
 
   selectAllPages = function(key) {
-    if (!isToeicMode() || key !== 'list') return original.selectAllPages(key);
+    if (!isToeicMode()) return original.selectAllPages(key);
 
-    const grid = document.getElementById('listPageGrid');
+    const grid = document.getElementById(key + 'PageGrid');
     if (!grid) return;
     grid.querySelectorAll('.toeic-priority-toggle').forEach(input => {
       input.checked = true;
     });
-    grid.querySelectorAll('.toeic-priority-group').forEach(syncToeicListLevelToggle);
-    saveToeicListFilterFromUi();
+    grid.querySelectorAll('.toeic-priority-group').forEach(syncToeicLevelToggle);
+    saveToeicFilterFromUi(key);
   };
 
   deselectAllPages = function(key) {
-    if (!isToeicMode() || key !== 'list') return original.deselectAllPages(key);
+    if (!isToeicMode()) return original.deselectAllPages(key);
 
-    const grid = document.getElementById('listPageGrid');
+    const grid = document.getElementById(key + 'PageGrid');
     if (!grid) return;
     grid.querySelectorAll('.toeic-priority-toggle').forEach(input => {
       input.checked = false;
     });
-    grid.querySelectorAll('.toeic-priority-group').forEach(syncToeicListLevelToggle);
-    saveToeicListFilterFromUi();
+    grid.querySelectorAll('.toeic-priority-group').forEach(syncToeicLevelToggle);
+    saveToeicFilterFromUi(key);
   };
 
   clearAllPageFilters = function() {
     if (!isToeicMode()) return original.clearAllPageFilters();
 
-    localStorage.removeItem(TOEIC_LIST_FILTER_KEY);
+    ['flashcard', 'quiz', 'list'].forEach(key => {
+      localStorage.removeItem(getToeicFilterStorageKey(key));
+    });
     original.clearAllPageFilters();
+  };
+
+  getFilteredWords = function(key) {
+    if (!isToeicMode()) return original.getFilteredWords(key);
+
+    const filter = getToeicFilter(key);
+    return WORD_DATA.words.filter(item =>
+      (filter[item.cefr] || []).includes(item.priority)
+    );
   };
 
   getWrongAnswers = function(correctAnswer, count = 3, field = 'meaning') {
@@ -449,11 +443,6 @@
 
     const mastery = getMastery();
     let filtered = getFilteredWords('list');
-    const cefrPriorityFilter = getToeicListFilter();
-
-    filtered = filtered.filter(item =>
-      (cefrPriorityFilter[item.cefr] || []).includes(item.priority)
-    );
 
     if (state.listSearch) {
       const search = state.listSearch.toLowerCase();
@@ -554,21 +543,19 @@
     document.querySelector('.header h1').textContent = '英単語単語帳 - TOEIC Bridge対策';
 
     document.querySelectorAll('.page-filter-title').forEach(el => {
-      el.textContent = el.closest('#listPageFilter')
-        ? 'CEFR・優先度を選択'
-        : 'CEFRレベルを選択';
+      el.textContent = 'CEFR・優先度を選択';
     });
 
     document.querySelectorAll('.page-filter-btns button').forEach(button => {
       const action = button.getAttribute('onclick') || '';
-      if (action.startsWith('selectAllPages')) button.textContent = '全レベル';
+      if (action.startsWith('selectAllPages')) button.textContent = '全選択';
       if (action.startsWith('deselectAllPages')) button.textContent = '選択解除';
-      if (action.startsWith('clearAllPageFilters')) button.textContent = '全レベルクリア';
+      if (action.startsWith('clearAllPageFilters')) button.textContent = '絞り込みリセット';
     });
 
     document.querySelectorAll('.page-filter-btn').forEach(button => {
       if ((button.getAttribute('onclick') || '').startsWith('togglePageFilter')) {
-        button.textContent = 'CEFR選択';
+        button.textContent = 'CEFR・優先度';
       }
     });
 
@@ -578,9 +565,11 @@
     const thirdHeader = document.querySelector('#wordTable thead th:nth-child(3)');
     if (thirdHeader) thirdHeader.textContent = 'CEFR / 優先度';
 
-    if (document.getElementById('listPageFilter')?.classList.contains('open')) {
-      setupPageFilter('list');
-    }
+    ['flashcard', 'quiz', 'list'].forEach(key => {
+      if (document.getElementById(key + 'PageFilter')?.classList.contains('open')) {
+        setupPageFilter(key);
+      }
+    });
   }
 
   function resetRuntimeState() {
@@ -637,7 +626,9 @@
 
   function setKosenLabels() {
     document.body.classList.remove('toeic-mode');
-    document.getElementById('listPageGrid')?.classList.remove('toeic-list-filter-grid');
+    document.querySelectorAll('.page-filter-grid').forEach(grid => {
+      grid.classList.remove('toeic-priority-filter-grid');
+    });
     document.querySelector('.header h1').textContent = '英単語単語帳';
 
     document.querySelectorAll('.page-filter-title').forEach(el => {
@@ -663,9 +654,11 @@
     const thirdHeader = document.querySelector('#wordTable thead th:nth-child(3)');
     if (thirdHeader) thirdHeader.textContent = 'ページ';
 
-    if (document.getElementById('listPageFilter')?.classList.contains('open')) {
-      original.setupPageFilter('list');
-    }
+    ['flashcard', 'quiz', 'list'].forEach(key => {
+      if (document.getElementById(key + 'PageFilter')?.classList.contains('open')) {
+        original.setupPageFilter(key);
+      }
+    });
   }
 
   function activateKosen() {
