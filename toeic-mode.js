@@ -577,6 +577,10 @@
 
     const thirdHeader = document.querySelector('#wordTable thead th:nth-child(3)');
     if (thirdHeader) thirdHeader.textContent = 'CEFR / 優先度';
+
+    if (document.getElementById('listPageFilter')?.classList.contains('open')) {
+      setupPageFilter('list');
+    }
   }
 
   function resetRuntimeState() {
@@ -658,6 +662,10 @@
 
     const thirdHeader = document.querySelector('#wordTable thead th:nth-child(3)');
     if (thirdHeader) thirdHeader.textContent = 'ページ';
+
+    if (document.getElementById('listPageFilter')?.classList.contains('open')) {
+      original.setupPageFilter('list');
+    }
   }
 
   function activateKosen() {
