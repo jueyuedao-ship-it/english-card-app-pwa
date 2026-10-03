@@ -188,3 +188,62 @@ body { font-family: 'Hiragino Sans', 'Hiragino Kaku Gothic ProN', 'Noto Sans JP'
   .toeic-mode .word-table th:nth-child(4),
   .toeic-mode .word-table td:nth-child(4) { width: 10%; }
 }
+
+
+/* TOEIC list: CEFR + priority filters */
+.toeic-mode #listPageGrid.toeic-list-filter-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  max-height: none;
+  overflow: visible;
+}
+
+.toeic-priority-group {
+  border: 1px solid #e5e5ef;
+  border-radius: 9px;
+  padding: 8px;
+  background: #fafaff;
+}
+
+.toeic-priority-heading {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 34px;
+  font-size: .88rem;
+  font-weight: 600;
+  color: #45455f;
+  cursor: pointer;
+}
+
+.toeic-priority-heading input,
+.toeic-priority-item input {
+  min-width: 18px;
+  min-height: 18px;
+}
+
+.toeic-priority-options {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 2px 4px;
+}
+
+.toeic-priority-item {
+  min-width: 0;
+}
+
+@media (max-width: 640px) {
+  .toeic-mode #listPageGrid.toeic-list-filter-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .toeic-priority-options {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
+
+  .toeic-priority-item {
+    justify-content: center;
+    padding: 4px 2px;
+  }
+}
