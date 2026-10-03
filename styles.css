@@ -117,3 +117,58 @@ body { font-family: 'Hiragino Sans', 'Hiragino Kaku Gothic ProN', 'Noto Sans JP'
   .study-mode-options { grid-template-columns: 1fr; }
   .study-mode-option { min-height: 150px; }
 }
+
+
+/* TOEIC Bridge: keep the Kosen layout, only contain long content on small screens */
+.toeic-mode .card-word,
+.toeic-mode .card-meaning,
+.toeic-mode .quiz-word,
+.toeic-mode .quiz-option,
+.toeic-mode .word-table th,
+.toeic-mode .word-table td {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.toeic-mode .card-word,
+.toeic-mode .card-meaning,
+.toeic-mode .quiz-word,
+.toeic-mode .quiz-option {
+  max-width: 100%;
+}
+
+@media (max-width: 640px) {
+  .toeic-mode .card-meaning {
+    font-size: 1rem;
+    line-height: 1.55;
+  }
+
+  .toeic-mode .quiz-word {
+    font-size: 1.4rem;
+    line-height: 1.4;
+  }
+
+  .toeic-mode .quiz-option {
+    padding: 14px 12px;
+    font-size: .92rem;
+    line-height: 1.45;
+    white-space: normal;
+  }
+
+  .toeic-mode .word-table {
+    table-layout: fixed;
+    min-width: 560px;
+  }
+
+  .toeic-mode .word-table th:nth-child(1),
+  .toeic-mode .word-table td:nth-child(1) { width: 22%; }
+
+  .toeic-mode .word-table th:nth-child(2),
+  .toeic-mode .word-table td:nth-child(2) { width: 48%; }
+
+  .toeic-mode .word-table th:nth-child(3),
+  .toeic-mode .word-table td:nth-child(3) { width: 20%; }
+
+  .toeic-mode .word-table th:nth-child(4),
+  .toeic-mode .word-table td:nth-child(4) { width: 10%; }
+}
