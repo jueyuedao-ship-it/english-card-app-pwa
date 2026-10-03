@@ -13,6 +13,8 @@
   ];
   const CEFR_TO_PAGE = { A1: 1, A2: 2, B1: 3 };
   const PAGE_TO_CEFR = { 1: 'A1', 2: 'A2', 3: 'B1' };
+  const KOSEN_WORDS = WORD_DATA.words.map(item => ({ ...item }));
+  let TOEIC_ROWS_CACHE = null;
 
   const original = {
     getPageFilter,
@@ -354,7 +356,7 @@
   }
 
   async function loadToeicData() {
-    if (window.TOEIC_BRIDGE_WORD_PARTS?.length === TOEIC_DATA_FILES.length) return;
+    if (TOEIC_ROWS_CACHE) return TOEIC_ROWS_CACHE;
 
     window.TOEIC_BRIDGE_WORD_PARTS = [];
     for (const file of TOEIC_DATA_FILES) {
@@ -364,6 +366,10 @@
     if (window.TOEIC_BRIDGE_WORD_PARTS.length !== TOEIC_DATA_FILES.length) {
       throw new Error('TOEIC Bridge vocabulary data is incomplete.');
     }
+
+    TOEIC_ROWS_CACHE = window.TOEIC_BRIDGE_WORD_PARTS.flat();
+    window.TOEIC_BRIDGE_WORD_PARTS = null;
+    return TOEIC_ROWS_CACHE;
   }
 
   function setToeicLabels() {
@@ -413,9 +419,8 @@
   }
 
   async function activateToeic() {
-    await loadToeicData();
+    const rows = await loadToeicData();
 
-    const rows = window.TOEIC_BRIDGE_WORD_PARTS.flat();
     if (rows.length !== 5021) {
       throw new Error(`Expected 5021 TOEIC Bridge entries, received ${rows.length}.`);
     }
@@ -437,7 +442,6 @@
       throw new Error('Unexpected CEFR level in TOEIC Bridge data.');
     }
 
-    window.TOEIC_BRIDGE_WORD_PARTS = null;
     resetRuntimeState();
     setToeicLabels();
 
@@ -447,8 +451,41 @@
     updateProgressInfo();
   }
 
-  function activateKosen() {
+  function setKosenLabels() {
     document.querySelector('.header h1').textContent = '英単語単語帳';
+
+    document.querySelectorAll('.page-filter-title').forEach(el => {
+      el.textContent = '表示するページを選択';
+    });
+
+    document.querySelectorAll('.page-filter-btns button').forEach(button => {
+      const action = button.getAttribute('onclick') || '';
+      if (action.startsWith('selectAllPages')) button.textContent = '全ページ';
+      if (action.startsWith('deselectAllPages')) button.textContent = '選択解除';
+      if (action.startsWith('clearAllPageFilters')) button.textContent = '全ページクリア';
+    });
+
+    document.querySelectorAll('.page-filter-btn').forEach(button => {
+      if ((button.getAttribute('onclick') || '').startsWith('togglePageFilter')) {
+        button.textContent = 'ページ選択';
+      }
+    });
+
+    document.getElementById('pageOrderBtn').textContent = 'ページ順';
+    document.getElementById('quizPageOrderBtn').textContent = 'ページ順';
+
+    const thirdHeader = document.querySelector('#wordTable thead th:nth-child(3)');
+    if (thirdHeader) thirdHeader.textContent = 'ページ';
+  }
+
+  function activateKosen() {
+    WORD_DATA.words = KOSEN_WORDS.map(item => ({ ...item }));
+    resetRuntimeState();
+    setKosenLabels();
+
+    const lastTab = localStorage.getItem('wordcard_last_tab');
+    const targetTab = ['flashcard', 'quiz', 'list'].includes(lastTab) ? lastTab : 'flashcard';
+    switchTab(targetTab);
     updateProgressInfo();
   }
 
@@ -461,8 +498,19 @@
     document.getElementById('appShell').hidden = true;
     const chooser = document.getElementById('studyModeChooser');
     chooser.hidden = false;
+
+    chooser.querySelectorAll('button').forEach(button => {
+      button.disabled = false;
+    });
+
     const error = document.getElementById('studyModeError');
     if (error) error.textContent = errorMessage;
+  }
+
+  function returnToStudyModeHome() {
+    localStorage.removeItem(MODE_KEY);
+    showChooser();
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
   async function chooseStudyMode(mode) {
@@ -490,6 +538,7 @@
   }
 
   window.chooseStudyMode = chooseStudyMode;
+  window.returnToStudyModeHome = returnToStudyModeHome;
 
   document.addEventListener('keydown', event => {
     const chooser = document.getElementById('studyModeChooser');
