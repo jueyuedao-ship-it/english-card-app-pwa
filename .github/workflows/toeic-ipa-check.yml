@@ -1,0 +1,46 @@
+name: TOEIC IPA check
+
+on:
+  push:
+    branches:
+      - feature/toeic-list-ipa
+  pull_request:
+    paths:
+      - 'toeic-*.js'
+      - 'index.html'
+      - 'styles.css'
+      - 'sw.js'
+      - 'tests/toeic-phonetics.test.mjs'
+      - 'scripts/implement-toeic-ipa.mjs'
+
+permissions:
+  contents: write
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Ensure eSpeak NG is available
+        run: command -v espeak-ng || { sudo apt-get update -qq && sudo apt-get install -y espeak-ng; }
+      - name: Generate pronunciation data and patch app
+        run: node scripts/implement-toeic-ipa.mjs
+      - name: Run pronunciation tests
+        run: node --test tests/toeic-phonetics.test.mjs
+      - name: Verify generated output is committed
+        if: github.event_name == 'pull_request'
+        run: git diff --exit-code
+      - name: Commit generated implementation
+        if: github.event_name == 'push'
+        run: |
+          if git diff --quiet; then
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add toeic-phonetics.js toeic-mode.js index.html styles.css sw.js
+          git commit -m 'feat: add TOEIC Bridge IPA pronunciations'
+          git push origin HEAD:${GITHUB_REF_NAME}

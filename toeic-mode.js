@@ -473,7 +473,16 @@
 
       const wordCell = document.createElement('td');
       wordCell.className = 'word-cell';
-      wordCell.textContent = item.word;
+
+      const wordText = document.createElement('div');
+      wordText.textContent = item.word;
+
+      const phonetic = document.createElement('div');
+      phonetic.className = 'word-phonetic';
+      phonetic.textContent = item.phonetic;
+
+      wordCell.appendChild(wordText);
+      wordCell.appendChild(phonetic);
 
       const meaningCell = document.createElement('td');
       meaningCell.textContent = item.meaning;
@@ -598,12 +607,18 @@
       throw new Error(`Expected 5021 TOEIC Bridge entries, received ${rows.length}.`);
     }
 
+    const phonetics = window.TOEIC_BRIDGE_PHONETICS;
+    if (!Array.isArray(phonetics) || phonetics.length !== rows.length || phonetics.some(value => !value)) {
+      throw new Error('TOEIC Bridge pronunciation data is incomplete.');
+    }
+
     WORD_DATA.words = rows.map((row, index) => {
       const [word, meaning, cefr, priority] = row;
       return {
         id: `toeic-${index + 1}`,
         word,
         meaning,
+        phonetic: phonetics[index],
         cefr,
         priority,
         rank: index + 1,
