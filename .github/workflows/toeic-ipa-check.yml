@@ -30,6 +30,9 @@ jobs:
         run: node scripts/implement-toeic-ipa.mjs
       - name: Run pronunciation tests
         run: node --test tests/toeic-phonetics.test.mjs
+      - name: Verify generated output is committed
+        if: github.event_name == 'pull_request'
+        run: git diff --exit-code
       - name: Commit generated implementation
         if: github.event_name == 'push'
         run: |
