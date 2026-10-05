@@ -1,0 +1,27 @@
+name: TOEIC IPA check
+
+on:
+  push:
+    branches:
+      - feature/toeic-list-ipa
+  pull_request:
+    paths:
+      - 'toeic-*.js'
+      - 'index.html'
+      - 'styles.css'
+      - 'sw.js'
+      - 'tests/toeic-phonetics.test.mjs'
+      - 'scripts/generate-toeic-phonetics.mjs'
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node --test tests/toeic-phonetics.test.mjs
