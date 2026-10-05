@@ -101,7 +101,8 @@ function parseCmu(text) {
     if (!match) continue;
     const rawWord = match[1].toLowerCase();
     const word = rawWord.replace(/\(\d+\)$/, '');
-    if (!dict.has(word)) dict.set(word, parsePhones(match[2]));
+    const phones = match[2].replace(/\s+#.*$/, '').trim();
+    if (phones && !dict.has(word)) dict.set(word, parsePhones(phones));
   }
   return dict;
 }
