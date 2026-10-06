@@ -1,0 +1,5 @@
+# Preserve the pinned reference bytes, including its original CRLF endings.
+data/toeic/cefrj-vocabulary-profile-1.5.csv -text whitespace=cr-at-eol
+# Deterministic generated assets must not change on Windows checkout.
+toeic-data-*.js text eol=lf
+data/toeic/entries.json text eol=lf

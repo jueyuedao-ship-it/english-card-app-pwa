@@ -613,7 +613,7 @@
     }
 
     WORD_DATA.words = rows.map((row, index) => {
-      const [word, meaning, cefr, priority] = row;
+      const [word, meaning, cefr, priority, pos, headword] = row;
       return {
         id: `toeic-${index + 1}`,
         word,
@@ -621,6 +621,8 @@
         phonetic: phonetics[index],
         cefr,
         priority,
+        pos,
+        headword,
         rank: index + 1,
         page: CEFR_TO_PAGE[cefr],
       };

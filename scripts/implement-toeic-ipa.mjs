@@ -1,5 +1,6 @@
 import { execFileSync } from 'node:child_process';
 import { readFileSync, writeFileSync } from 'node:fs';
+import { upgradeIpaCacheVersion } from './ipa-cache-version.mjs';
 
 const DATA_FILES = Array.from({ length: 8 }, (_, i) => `toeic-data-${i + 1}.js`);
 const CMUDICT_URL = 'https://raw.githubusercontent.com/cmusphinx/cmudict/master/cmudict.dict';
@@ -203,7 +204,9 @@ function patchAppFiles() {
   const styleBlock = `\n\n/* TOEIC Bridge pronunciation */\n.toeic-mode .word-phonetic {\n  margin-top: 2px;\n  color: #68697a;\n  font-size: .78rem;\n  font-weight: 400;\n  line-height: 1.3;\n  letter-spacing: .01em;\n}\n`;
   if (!styles.includes('.word-phonetic')) writeFileSync('styles.css', styles.trimEnd() + styleBlock + '\n');
 
-  replaceOnce('sw.js', "const CACHE_NAME = CACHE_PREFIX + 'v8';", "const CACHE_NAME = CACHE_PREFIX + 'v9';");
+  const worker = readFileSync('sw.js', 'utf8');
+  const upgradedWorker = upgradeIpaCacheVersion(worker);
+  if (worker !== upgradedWorker) writeFileSync('sw.js', upgradedWorker);
   replaceOnce(
     'sw.js',
     "  './toeic-data-8.js',\n  './pwa.js',",
