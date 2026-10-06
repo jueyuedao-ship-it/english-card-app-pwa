@@ -1,5 +1,25 @@
 # Third-Party Notices
 
+## CEFR-J Wordlist Version 1.5
+
+The reference `data/toeic/cefrj-vocabulary-profile-1.5.csv` and the English
+headword, POS and CEFR fields are from The CEFR-J Wordlist Version 1.5,
+compiled by Yukio Tono, Tono Laboratory, Tokyo University of Foreign Studies.
+Copyright belongs to Tono Laboratory at TUFS.
+
+Source: https://github.com/openlanguageprofiles/olp-en-cefrj/blob/d4e45b75b38f27b30dfc5c44d8c571aec7e7092f/cefrj-vocabulary-profile-1.5.csv
+
+The Open Language Profiles repository reports that this reference was
+retrieved from http://www.cefr-j.org/download.html on January 20, 2020.
+Its terms permit research and commercial use without charge with proper
+attribution. CEFR-J and Open Language Profiles disclaim responsibility for
+inaccuracies or damage arising from use of the data. Terms:
+https://github.com/openlanguageprofiles/olp-en-cefrj/blob/d4e45b75b38f27b30dfc5c44d8c571aec7e7092f/README.md
+
+Japanese learner glosses in `data/toeic/entries.json` were authored for this
+application against the reference POS. They are not Japanese translations
+provided or endorsed by CEFR-J, and the list is not an official TOEIC list.
+
 ## CMU Pronouncing Dictionary (CMUdict)
 
 The generated TOEIC Bridge pronunciation data in `toeic-phonetics.js` is derived primarily from CMUdict.
