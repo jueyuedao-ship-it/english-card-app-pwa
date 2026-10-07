@@ -70,6 +70,13 @@
     <div class="page-filter-grid" id="flashcardPageGrid"></div>
   </div>
   <button class="page-filter-btn" onclick="togglePageFilter('flashcard')">ページ選択</button>
+  <div class="status-filters" id="flashcardStatusFilters" role="group" aria-label="フラッシュカードの学習状況">
+    <span class="status-filter-label">学習状況</span>
+    <button class="filter-btn" data-status-filter="all" aria-pressed="true" onclick="setLearningFilter('flashcard', 'all', this)">全部</button>
+    <button class="filter-btn" data-status-filter="perfect" aria-pressed="false" onclick="setLearningFilter('flashcard', 'perfect', this)">完璧</button>
+    <button class="filter-btn" data-status-filter="uncertain" aria-pressed="false" onclick="setLearningFilter('flashcard', 'uncertain', this)">不安</button>
+    <button class="filter-btn" data-status-filter="unattempted" aria-pressed="false" onclick="setLearningFilter('flashcard', 'unattempted', this)">未挑戦</button>
+  </div>
   <div class="card-area">
     <div class="card" id="flashcard" onclick="flipCard()">
       <div class="card-word" id="flashcardWord"></div>
@@ -101,6 +108,13 @@
     <div class="page-filter-grid" id="quizPageGrid"></div>
   </div>
   <button class="page-filter-btn" onclick="togglePageFilter('quiz')">ページ選択</button>
+  <div class="status-filters" id="quizStatusFilters" role="group" aria-label="クイズの学習状況">
+    <span class="status-filter-label">学習状況</span>
+    <button class="filter-btn" data-status-filter="all" aria-pressed="true" onclick="setLearningFilter('quiz', 'all', this)">全部</button>
+    <button class="filter-btn" data-status-filter="perfect" aria-pressed="false" onclick="setLearningFilter('quiz', 'perfect', this)">完璧</button>
+    <button class="filter-btn" data-status-filter="uncertain" aria-pressed="false" onclick="setLearningFilter('quiz', 'uncertain', this)">不安</button>
+    <button class="filter-btn" data-status-filter="unattempted" aria-pressed="false" onclick="setLearningFilter('quiz', 'unattempted', this)">未挑戦</button>
+  </div>
   <div class="quiz-mode-toggle">
     <button class="filter-btn" id="quizModeBtn" onclick="toggleQuizMode()">英→和</button>
     <button class="filter-btn" id="quizShuffleBtn" onclick="toggleQuizShuffle()">シャッフル</button>
@@ -130,20 +144,24 @@
   <button class="page-filter-btn" onclick="togglePageFilter('list')">ページ選択</button>
   <div class="list-toolbar">
     <input class="search-input" type="text" id="searchInput" placeholder="英単語・和訳で検索..." oninput="filterList()">
-    <button class="filter-btn active" onclick="setFilter('all', this)">全部</button>
-    <button class="filter-btn" onclick="setFilter('done', this)">完璧済</button>
-    <button class="filter-btn" onclick="setFilter('undone', this)">未完璧</button>
+    <div class="status-filters" id="listStatusFilters" role="group" aria-label="単語リストの学習状況">
+      <button class="filter-btn" data-status-filter="all" aria-pressed="true" onclick="setLearningFilter('list', 'all', this)">全部</button>
+      <button class="filter-btn" data-status-filter="perfect" aria-pressed="false" onclick="setLearningFilter('list', 'perfect', this)">完璧</button>
+      <button class="filter-btn" data-status-filter="uncertain" aria-pressed="false" onclick="setLearningFilter('list', 'uncertain', this)">不安</button>
+      <button class="filter-btn" data-status-filter="unattempted" aria-pressed="false" onclick="setLearningFilter('list', 'unattempted', this)">未挑戦</button>
+    </div>
   </div>
   <div class="list-stats" id="listStats"></div>
   <div class="table-wrapper">
     <table class="word-table" id="wordTable">
-      <thead><tr><th>英単語</th><th>和訳</th><th>ページ</th><th>完璧</th></tr></thead>
+      <thead><tr><th>英単語</th><th>和訳</th><th>ページ</th><th>学習状況</th></tr></thead>
       <tbody id="wordTableBody"></tbody>
     </table>
   </div>
 </div>
 
 </div>
+<script src="./learning-status.js"></script>
 <script src="./app.js"></script>
 <script src="./toeic-phonetics.js"></script>
 <script src="./toeic-mode.js"></script>

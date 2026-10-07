@@ -43,12 +43,14 @@ test('TOEIC Bridge IPA data covers all 5,021 vocabulary rows', () => {
 
 test('TOEIC list integrates and renders the phonetic field', () => {
   const modeSource = readFileSync(join(root, 'toeic-mode.js'), 'utf8');
+  const appSource = readFileSync(join(root, 'app.js'), 'utf8');
   const html = readFileSync(join(root, 'index.html'), 'utf8');
   const css = readFileSync(join(root, 'styles.css'), 'utf8');
   const sw = readFileSync(join(root, 'sw.js'), 'utf8');
 
   assert.match(modeSource, /phonetic\s*:/, 'TOEIC rows must receive a phonetic field');
-  assert.match(modeSource, /word-phonetic/, 'TOEIC list must render a phonetic element');
+  assert.match(appSource, /word-phonetic/, 'the shared list renderer must render a phonetic element');
+  assert.match(appSource, /if\s*\(w\.phonetic\)/, 'the renderer must display phonetics when a word provides one');
   assert.match(html, /toeic-phonetics\.js["']/, 'the pronunciation asset must load in the app');
   assert.ok(html.indexOf('toeic-phonetics.js') < html.indexOf('toeic-mode.js'), 'pronunciation data must load before toeic-mode.js');
   assert.match(css, /\.word-phonetic\b/, 'pronunciation styling must exist');

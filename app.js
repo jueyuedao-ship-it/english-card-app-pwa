@@ -16,9 +16,11 @@ const WORD_COUNT = 498;
 
 // ============ APP STATE ============
 const state = {
+  studyMode: 'kosen',
   currentTab: 'flashcard',
   flashcardIndex: 0,
   flashcardOrder: [],
+  flashcardSeen: new Set(),
   flashcardFlipped: false,
   flashcardShuffle: false,
   flashcardMode: null,
@@ -29,6 +31,9 @@ const state = {
   quizPageOrder: false,
   quizIndex: 0,
   quizOrder: [],
+  quizSeen: new Set(),
+  quizGeneration: 0,
+  quizAnsweredGeneration: null,
   quizCorrect: 0,
   quizTotal: 0,
   listFilter: 'all',
@@ -55,27 +60,107 @@ function getFilteredWords(key) {
   return WORD_DATA.words.filter(w => pages.includes(w.page));
 }
 
-function getMastery() {
-  const saved = localStorage.getItem('wordcard_mastery');
-  if (!saved) return new Set();
-  const parsed = JSON.parse(saved);
-  return parsed instanceof Set ? parsed : new Set(parsed);
+const LEARNING_FILTERS = ['all', 'perfect', 'uncertain', 'unattempted'];
+const LEARNING_FILTER_LABELS = {
+  all: '全部',
+  perfect: '完璧',
+  uncertain: '不安',
+  unattempted: '未挑戦',
+};
+
+function getWordIdentity(word) {
+  return typeof word === 'string' ? word : (word?.id || word?.word);
 }
+
+function getLearningStatusStore() {
+  const prefix = state.studyMode === 'toeic' ? 'wordcard_toeic_' : 'wordcard_';
+  return LearningStatus.createLearningStatusStore({
+    storage: localStorage,
+    prefix,
+    getWords: () => WORD_DATA.words,
+    getIdentity: getWordIdentity,
+  });
+}
+
+function getLearningStatuses() {
+  return getLearningStatusStore().getAll();
+}
+
+function getWordStatus(word) {
+  return getLearningStatusStore().get(getWordIdentity(word));
+}
+
+function setWordStatus(word, status) {
+  return getLearningStatusStore().set(getWordIdentity(word), status);
+}
+
+function getStatusFilterStorageKey(tab) {
+  const prefix = state.studyMode === 'toeic' ? 'wordcard_toeic_' : 'wordcard_';
+  return `${prefix}${tab}_status_filter_v1`;
+}
+
+function getLearningFilter(tab) {
+  const saved = localStorage.getItem(getStatusFilterStorageKey(tab));
+  return LEARNING_FILTERS.includes(saved) ? saved : 'all';
+}
+
+function updateLearningFilterButtons(tab) {
+  const group = document.getElementById(tab + 'StatusFilters');
+  if (!group) return;
+  const selected = getLearningFilter(tab);
+  group.querySelectorAll('[data-status-filter]').forEach(button => {
+    const active = button.dataset.statusFilter === selected;
+    button.classList.toggle('active', active);
+    button.setAttribute('aria-pressed', String(active));
+  });
+}
+
+function getStatusFilteredWords(tab, words = getFilteredWords(tab)) {
+  return LearningStatus.filterWordsByStatus(words, getLearningStatuses(), getLearningFilter(tab), getWordIdentity);
+}
+
+function setLearningFilter(tab, filter) {
+  if (!['flashcard', 'quiz', 'list'].includes(tab) || !LEARNING_FILTERS.includes(filter)) return;
+  localStorage.setItem(getStatusFilterStorageKey(tab), filter);
+  updateLearningFilterButtons(tab);
+  if (tab === 'flashcard') initFlashcard();
+  else if (tab === 'quiz') initQuiz();
+  else renderList();
+}
+
+function getMastery() {
+  return new Set(Object.entries(getLearningStatuses())
+    .filter(([, status]) => status === 'perfect')
+    .map(([key]) => key));
+}
+
 function setMastery(set) {
-  localStorage.setItem('wordcard_mastery', JSON.stringify([...set]));
+  const store = getLearningStatusStore();
+  const next = store.getAll();
+  const perfect = new Set([...set].filter(key => store.validKeys().has(key)));
+  for (const [key, status] of Object.entries(next)) {
+    if (status === 'perfect' && !perfect.has(key)) delete next[key];
+  }
+  for (const key of perfect) next[key] = 'perfect';
+  store.replace(next);
 }
 
 function getFlashcardStats() {
-  const known = localStorage.getItem('wordcard_known');
-  const unknown = localStorage.getItem('wordcard_unknown');
+  const statuses = getLearningStatuses();
   return {
-    known: known ? new Set(JSON.parse(known)) : new Set(),
-    unknown: unknown ? new Set(JSON.parse(unknown)) : new Set(),
+    known: new Set(Object.entries(statuses).filter(([, value]) => value === 'perfect').map(([key]) => key)),
+    unknown: new Set(Object.entries(statuses).filter(([, value]) => value === 'uncertain').map(([key]) => key)),
   };
 }
+
 function setFlashcardStats(known, unknown) {
-  localStorage.setItem('wordcard_known', JSON.stringify([...known]));
-  localStorage.setItem('wordcard_unknown', JSON.stringify([...unknown]));
+  const store = getLearningStatusStore();
+  const next = store.getAll();
+  const keys = store.validKeys();
+  for (const key of [...known, ...unknown]) if (keys.has(key)) delete next[key];
+  for (const key of known) if (keys.has(key)) next[key] = 'perfect';
+  for (const key of unknown) if (keys.has(key)) next[key] = 'uncertain';
+  store.replace(next);
 }
 
 // ============ PAGE FILTER ============
@@ -139,6 +224,7 @@ function clearAllPageFilters() {
 function switchTab(tab) {
   state.currentTab = tab;
   localStorage.setItem('wordcard_last_tab', tab);
+  updateLearningFilterButtons(tab);
   document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.tab === tab));
   document.querySelectorAll('.mode-panel').forEach(p => p.classList.remove('active'));
   document.getElementById('panel-' + tab).classList.add('active');
@@ -178,15 +264,37 @@ function updateProgressInfo() {
 }
 
 // ============ FLASHCARD ============
+function refreshPendingWords(tab, order, seen, shuffleAdditions = false) {
+  const pending = getStatusFilteredWords(tab).filter(word => !seen.has(getWordIdentity(word)));
+  const eligible = new Set(pending.map(getWordIdentity));
+  const retained = order.filter(word => eligible.has(getWordIdentity(word)));
+  const retainedKeys = new Set(retained.map(getWordIdentity));
+  let additions = pending.filter(word => !retainedKeys.has(getWordIdentity(word)));
+  if (shuffleAdditions) additions = shuffle(additions);
+  return retained.concat(additions);
+}
+
+function setFlashcardControlsDisabled(disabled) {
+  document.querySelectorAll('#panel-flashcard .card-controls button').forEach(button => {
+    button.disabled = disabled;
+  });
+  const card = document.getElementById('flashcard');
+  card.setAttribute('aria-disabled', String(disabled));
+  card.classList.toggle('card-empty', disabled);
+}
+
 function initFlashcard() {
   const stats = getFlashcardStats();
   state.flashcardKnown = stats.known;
   state.flashcardUnknown = stats.unknown;
+  state.flashcardSeen = new Set();
   state.flashcardIndex = 0;
   state.flashcardFlipped = false;
-  const filtered = getFilteredWords('flashcard');
+  const filtered = getStatusFilteredWords('flashcard');
+  updateLearningFilterButtons('flashcard');
   if (filtered.length === 0) {
-    document.getElementById('flashcardStats').textContent = '選択されたページの単語がありません';
+    state.flashcardOrder = [];
+    showFlashcard();
     return;
   }
   if (!state.flashcardMode) {
@@ -201,14 +309,11 @@ function initFlashcard() {
 }
 
 function toggleShuffle() {
-  state.flashcardKnown.clear();
-  state.flashcardUnknown.clear();
-  localStorage.removeItem('wordcard_known');
-  localStorage.removeItem('wordcard_unknown');
   state.flashcardMode = 'shuffle';
   state.flashcardIndex = 0;
+  state.flashcardSeen = new Set();
   state.flashcardFlipped = false;
-  const filtered = getFilteredWords('flashcard');
+  const filtered = getStatusFilteredWords('flashcard');
   state.flashcardOrder = shuffle(filtered);
   document.getElementById('shuffleBtn').classList.add('active');
   document.getElementById('pageOrderBtn').classList.remove('active');
@@ -219,14 +324,11 @@ function toggleShuffle() {
 }
 
 function togglePageOrder() {
-  state.flashcardKnown.clear();
-  state.flashcardUnknown.clear();
-  localStorage.removeItem('wordcard_known');
-  localStorage.removeItem('wordcard_unknown');
   state.flashcardMode = 'page';
   state.flashcardIndex = 0;
+  state.flashcardSeen = new Set();
   state.flashcardFlipped = false;
-  const filtered = getFilteredWords('flashcard');
+  const filtered = getStatusFilteredWords('flashcard');
   state.flashcardOrder = filtered;
   document.getElementById('pageOrderBtn').classList.add('active');
   document.getElementById('shuffleBtn').classList.remove('active');
@@ -237,42 +339,65 @@ function togglePageOrder() {
 }
 
 function showFlashcard() {
-  const word = state.flashcardOrder[state.flashcardIndex];
+  state.flashcardOrder = refreshPendingWords(
+    'flashcard', state.flashcardOrder, state.flashcardSeen, state.flashcardMode === 'shuffle'
+  );
+  state.flashcardIndex = 0;
+  const word = state.flashcardOrder[0];
   const card = document.getElementById('flashcard');
+
+  if (!word) {
+    card.classList.remove('card-flipped');
+    document.getElementById('flashcardWord').textContent = '';
+    document.getElementById('flashcardMeaning').textContent = '';
+    document.getElementById('flashcardPage').textContent = '';
+    document.getElementById('flashcardStats').textContent =
+      getStatusFilteredWords('flashcard').length === 0
+        ? '条件に合う単語がありません'
+        : 'おめでとうございます！全語完了！';
+    setFlashcardControlsDisabled(true);
+    state.flashcardFlipped = false;
+    return;
+  }
+
+  setFlashcardControlsDisabled(false);
   card.classList.remove('card-flipped');
   const isApp = isAppendix(word);
   document.getElementById('flashcardWord').textContent = isApp ? word.meaning : word.word;
   document.getElementById('flashcardMeaning').textContent = isApp ? word.word : word.meaning;
-  document.getElementById('flashcardPage').textContent = 'p.' + word.page;
 
   const known = state.flashcardKnown.size;
   const unknown = state.flashcardUnknown.size;
-  const total = state.flashcardOrder.length;
-  const progress = state.flashcardIndex + 1;
+  const total = state.flashcardSeen.size + state.flashcardOrder.length;
+  const progress = state.flashcardSeen.size + 1;
   document.getElementById('flashcardStats').textContent = `${progress}/${total} | 知っていた: ${known} | 知っていなかった: ${unknown}`;
+  document.getElementById('flashcardPage').textContent = state.studyMode === 'toeic'
+    ? `CEFR ${word.cefr} / #${word.rank} / ${word.priority}`
+    : 'p.' + word.page;
 }
 
 function flipCard() {
+  if (!state.flashcardOrder[0]) return;
   const card = document.getElementById('flashcard');
   state.flashcardFlipped = !state.flashcardFlipped;
   card.classList.toggle('card-flipped', state.flashcardFlipped);
 }
 
 function markCard(known) {
-  const word = state.flashcardOrder[state.flashcardIndex];
-  if (known) {
-    state.flashcardKnown.add(word.word);
-  } else {
-    state.flashcardUnknown.add(word.word);
-  }
-  setFlashcardStats(state.flashcardKnown, state.flashcardUnknown);
-
-  if (state.flashcardIndex < state.flashcardOrder.length - 1) {
-    state.flashcardIndex++;
-    showFlashcard();
-  } else {
-    document.getElementById('flashcardStats').textContent = 'おめでとうございます！全語完了！';
-  }
+  const word = state.flashcardOrder[0];
+  if (!word) return;
+  const key = getWordIdentity(word);
+  setWordStatus(word, known ? 'perfect' : 'uncertain');
+  const stats = getFlashcardStats();
+  state.flashcardKnown = stats.known;
+  state.flashcardUnknown = stats.unknown;
+  state.flashcardSeen.add(key);
+  state.flashcardOrder = refreshPendingWords(
+    'flashcard', state.flashcardOrder, state.flashcardSeen, state.flashcardMode === 'shuffle'
+  );
+  state.flashcardIndex = 0;
+  state.flashcardFlipped = false;
+  showFlashcard();
   updateProgressInfo();
 }
 
@@ -288,36 +413,49 @@ function isAppendix(word) {
 }
 
 function initQuiz() {
+  state.quizSeen = new Set();
   state.quizIndex = 0;
+  const filtered = getStatusFilteredWords('quiz');
   if (state.quizShuffle) {
-    state.quizOrder = shuffle(getFilteredWords('quiz'));
+    state.quizOrder = shuffle(filtered);
   } else if (state.quizPageOrder) {
-    state.quizOrder = getFilteredWords('quiz');
+    state.quizOrder = filtered;
   } else {
-    state.quizOrder = shuffle(getFilteredWords('quiz'));
+    state.quizOrder = shuffle(filtered);
   }
   state.quizCorrect = 0;
   state.quizTotal = 0;
+  updateLearningFilterButtons('quiz');
   showQuiz();
 }
 
 function showQuiz() {
-  if (state.quizOrder.length === 0) {
-    document.getElementById('quizResult').textContent = '選択されたページの単語がありません';
-    document.getElementById('quizWord').textContent = '選択してください';
-    document.getElementById('quizOptions').innerHTML = '';
+  state.quizOrder = refreshPendingWords(
+    'quiz', state.quizOrder, state.quizSeen, state.quizShuffle || !state.quizPageOrder
+  );
+  state.quizIndex = 0;
+  const token = ++state.quizGeneration;
+  state.quizAnsweredGeneration = null;
+  const word = state.quizOrder[0];
+
+  if (!word) {
+    const container = document.getElementById('quizOptions');
+    container.innerHTML = '';
+    if (getStatusFilteredWords('quiz').length > 0 && state.quizSeen.size > 0) {
+      const rate = state.quizTotal > 0 ? Math.round(state.quizCorrect / state.quizTotal * 100) : 0;
+      document.getElementById('quizResult').textContent = `おめでとうございます！全問題完了！正解率: ${rate}%`;
+      document.getElementById('quizWord').textContent = '✓完了！';
+      const retry = document.createElement('button');
+      retry.className = 'btn btn-primary';
+      retry.textContent = 'もう一度';
+      retry.onclick = initQuiz;
+      container.appendChild(retry);
+    } else {
+      document.getElementById('quizResult').textContent = '条件に合う単語がありません';
+      document.getElementById('quizWord').textContent = '';
+    }
     return;
   }
-
-  if (state.quizIndex >= state.quizOrder.length) {
-    const rate = state.quizTotal > 0 ? Math.round(state.quizCorrect / state.quizTotal * 100) : 0;
-    document.getElementById('quizResult').textContent = `おめでとうございます！全問題完了！正解率: ${rate}%`;
-    document.getElementById('quizWord').textContent = '✓完了！';
-    document.getElementById('quizOptions').innerHTML = '<button class="btn btn-primary" onclick="initQuiz()">もう一度</button>';
-    return;
-  }
-
-  const word = state.quizOrder[state.quizIndex];
   const { questionField, answerField, wrongField } = getQuizFields();
   const question = word[questionField];
   const correct = word[answerField];
@@ -335,12 +473,20 @@ function showQuiz() {
     const btn = document.createElement('button');
     btn.className = 'quiz-option';
     btn.textContent = opt;
-    btn.onclick = () => checkQuiz(btn, opt, correct);
+    const key = getWordIdentity(word);
+    const mode = state.studyMode;
+    btn.onclick = () => checkQuiz(btn, opt, correct, token, key, mode);
     container.appendChild(btn);
   });
 }
 
-function checkQuiz(btn, selected, correct) {
+function checkQuiz(btn, selected, correct, token = state.quizGeneration,
+  wordKey = getWordIdentity(state.quizOrder[0]), mode = state.studyMode) {
+  if (token !== state.quizGeneration || state.quizAnsweredGeneration === token || mode !== state.studyMode) return;
+  const word = state.quizOrder[0];
+  if (!word || getWordIdentity(word) !== wordKey) return;
+  state.quizAnsweredGeneration = token;
+
   const buttons = document.querySelectorAll('#quizOptions .quiz-option');
   buttons.forEach(b => {
     b.classList.add('disabled');
@@ -355,14 +501,21 @@ function checkQuiz(btn, selected, correct) {
   }
   state.quizTotal++;
 
-  if (selected === correct) state.flashcardKnown.add(state.quizOrder[state.quizIndex].word);
-  else state.flashcardUnknown.add(state.quizOrder[state.quizIndex].word);
+  setWordStatus(word, selected === correct ? 'perfect' : 'uncertain');
+  const stats = getFlashcardStats();
+  state.flashcardKnown = stats.known;
+  state.flashcardUnknown = stats.unknown;
 
   document.getElementById('quizResult').textContent = selected === correct ? '正解！' : `不正解 😅 正解は ${correct}`;
   updateProgressInfo();
 
   setTimeout(() => {
-    state.quizIndex++;
+    if (state.quizGeneration !== token || state.studyMode !== mode) return;
+    state.quizSeen.add(wordKey);
+    state.quizOrder = refreshPendingWords(
+      'quiz', state.quizOrder, state.quizSeen, state.quizShuffle || !state.quizPageOrder
+    );
+    state.quizIndex = 0;
     showQuiz();
   }, 1200);
 }
@@ -400,7 +553,7 @@ function toggleQuizPageOrder() {
 
 // ============ LIST ============
 function renderList() {
-  const mastery = getMastery();
+  const statuses = getLearningStatuses();
   let filtered = getFilteredWords('list');
 
   if (state.listSearch) {
@@ -408,35 +561,60 @@ function renderList() {
     filtered = filtered.filter(w => w.word.toLowerCase().includes(s) || w.meaning.includes(s));
   }
 
-  if (state.listFilter === 'done') filtered = filtered.filter(w => mastery.has(w.word));
-  if (state.listFilter === 'undone') filtered = filtered.filter(w => !mastery.has(w.word));
+  filtered = LearningStatus.filterWordsByStatus(filtered, statuses, getLearningFilter('list'), getWordIdentity);
+  updateLearningFilterButtons('list');
 
   document.getElementById('listStats').textContent = `${filtered.length}語中表示`;
 
   const tbody = document.getElementById('wordTableBody');
   tbody.innerHTML = '';
   filtered.forEach(w => {
-    const done = mastery.has(w.word);
+    const status = statuses[getWordIdentity(w)] || 'unattempted';
     const tr = document.createElement('tr');
-    if (done) tr.className = 'mastery-done';
+    if (status === 'perfect') tr.classList.add('learning-perfect');
+    if (status === 'uncertain') tr.classList.add('learning-uncertain');
 
     const isApp = isAppendix(w);
     const td1 = document.createElement('td');
     td1.className = 'word-cell';
-    td1.textContent = isApp ? w.meaning : w.word;
+    if (w.phonetic) {
+      const wordText = document.createElement('div');
+      wordText.textContent = w.word;
+      const phonetic = document.createElement('div');
+      phonetic.className = 'word-phonetic';
+      phonetic.textContent = w.phonetic;
+      td1.appendChild(wordText);
+      td1.appendChild(phonetic);
+    } else {
+      td1.textContent = isApp ? w.meaning : w.word;
+    }
 
     const td2 = document.createElement('td');
     td2.textContent = isApp ? w.word : w.meaning;
 
     const td3 = document.createElement('td');
-    td3.textContent = 'p.' + w.page;
+    td3.textContent = state.studyMode === 'toeic'
+      ? `${w.cefr} / ${w.priority}`
+      : 'p.' + w.page;
 
     const td4 = document.createElement('td');
-    const span = document.createElement('span');
-    span.className = 'mastery-toggle ' + (done ? 'done' : '');
-    span.textContent = done ? '★' : '☆';
-    span._word = w.word; // Store directly, avoids HTML attribute parsing issues
-    td4.appendChild(span);
+    td4.className = 'status-cell';
+    ['perfect', 'uncertain'].forEach(value => {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'status-tag status-tag-' + value + (status === value ? ' selected' : '');
+      button.textContent = LEARNING_FILTER_LABELS[value];
+      button.setAttribute('aria-label', `${w.word}を${LEARNING_FILTER_LABELS[value]}に設定`);
+      button.setAttribute('aria-pressed', String(status === value));
+      button._wordKey = getWordIdentity(w);
+      button._status = value;
+      td4.appendChild(button);
+    });
+    const emptyStatus = document.createElement('span');
+    emptyStatus.className = 'status-empty';
+    emptyStatus.textContent = LEARNING_FILTER_LABELS.unattempted;
+    emptyStatus.hidden = status !== 'unattempted';
+    td4.appendChild(emptyStatus);
 
     tr.appendChild(td1);
     tr.appendChild(td2);
@@ -451,44 +629,40 @@ function filterList() {
   renderList();
 }
 
-function setFilter(filter, btn) {
-  state.listFilter = filter;
-  document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
-  btn.classList.add('active');
-  renderList();
+function setFilter(filter) {
+  const mapped = ({ done: 'perfect', undone: 'unattempted' })[filter] || filter;
+  setLearningFilter('list', LEARNING_FILTERS.includes(mapped) ? mapped : 'all');
 }
 
 function toggleMastery(word, el) {
-  const mastery = getMastery();
-  if (mastery.has(word)) {
-    mastery.delete(word);
-    el.classList.remove('done');
-    el.textContent = '☆';
-    el.closest('tr').classList.remove('mastery-done');
-  } else {
-    mastery.add(word);
-    el.classList.add('done');
-    el.textContent = '★';
-    el.closest('tr').classList.add('mastery-done');
-  }
-  setMastery(mastery);
+  const status = getWordStatus(word);
+  setWordStatus(word, status === 'perfect' ? 'unattempted' : 'perfect');
+  renderList();
   updateProgressInfo();
 }
 
-// Event delegation for mastery toggles (uses element property, not data attribute)
+// Row status controls use properties rather than data attributes so original
+// vocabulary identities are not parsed or truncated by HTML.
 document.addEventListener('click', (e) => {
-  const toggle = e.target.closest('.mastery-toggle');
-  if (toggle && toggle._word) {
-    toggleMastery(toggle._word, toggle);
+  const toggle = e.target.closest('.status-tag');
+  if (toggle && toggle._wordKey) {
+    const nextStatus = getWordStatus(toggle._wordKey) === toggle._status
+      ? 'unattempted' : toggle._status;
+    setWordStatus(toggle._wordKey, nextStatus);
+    renderList();
+    updateProgressInfo();
   }
 });
 
 // ============ PROGRESS EXPORT/IMPORT ============
 function exportProgress() {
+  const statuses = getLearningStatuses();
+  const stats = getFlashcardStats();
   const data = {
+    statuses,
     mastery: [...getMastery()],
-    flashcardKnown: [...state.flashcardKnown],
-    flashcardUnknown: [...state.flashcardUnknown],
+    flashcardKnown: [...stats.known],
+    flashcardUnknown: [...stats.unknown],
     quizCorrect: state.quizCorrect,
     quizTotal: state.quizTotal,
     exportedAt: new Date().toISOString(),
@@ -505,16 +679,22 @@ function exportProgress() {
 function importProgress(event) {
   const file = event.target.files[0];
   if (!file) return;
+  const importMode = state.studyMode;
   const reader = new FileReader();
   reader.onload = (e) => {
     try {
       const data = JSON.parse(e.target.result);
-      if (data.mastery) setMastery(new Set(data.mastery));
-      if (data.flashcardKnown) state.flashcardKnown = new Set(data.flashcardKnown);
-      if (data.flashcardUnknown) state.flashcardUnknown = new Set(data.flashcardUnknown);
-      if (data.flashcardKnown) setFlashcardStats(new Set(data.flashcardKnown), new Set(data.flashcardUnknown || []));
+      if (state.studyMode !== importMode) throw new Error('Study mode changed during import.');
+      const store = getLearningStatusStore();
+      const statuses = LearningStatus.normalizeImportedStatuses(data, store.validKeys());
+      store.replace(statuses);
+      const stats = getFlashcardStats();
+      state.flashcardKnown = stats.known;
+      state.flashcardUnknown = stats.unknown;
       updateProgressInfo();
-      renderList();
+      if (state.currentTab === 'flashcard') initFlashcard();
+      else if (state.currentTab === 'quiz') initQuiz();
+      else renderList();
       alert('進捗データをインポートしました！');
     } catch (err) {
       alert('ファイルの読み込みに失敗しました');
@@ -526,6 +706,11 @@ function importProgress(event) {
 
 // ============ KEYBOARD NAVIGATION ============
 document.addEventListener('keydown', (e) => {
+  const interactiveTarget = e.target?.closest?.(
+    'button, input, select, textarea, a, [contenteditable], [role="textbox"]'
+  );
+  if (e.target?.isContentEditable || interactiveTarget) return;
+
   if (state.currentTab === 'flashcard') {
     if (e.code === 'Space') { e.preventDefault(); flipCard(); }
     if (e.code === 'ArrowRight' || e.code === 'Enter') {
@@ -561,4 +746,34 @@ function initApp() {
   switchTab(targetTab);
   updateProgressInfo();
 }
-initApp();
+
+window.addEventListener('storage', event => {
+  const store = getLearningStatusStore();
+  const prefix = state.studyMode === 'toeic' ? 'wordcard_toeic_' : 'wordcard_';
+  if (event.key === store.statusKey) {
+    const stats = getFlashcardStats();
+    state.flashcardKnown = stats.known;
+    state.flashcardUnknown = stats.unknown;
+    updateProgressInfo();
+    if (state.currentTab === 'list') renderList();
+    if (state.currentTab === 'flashcard') showFlashcard();
+    if (state.currentTab === 'quiz' && state.quizAnsweredGeneration !== state.quizGeneration) {
+      state.quizOrder = refreshPendingWords(
+        'quiz', state.quizOrder, state.quizSeen, state.quizShuffle || !state.quizPageOrder
+      );
+      showQuiz();
+    }
+    return;
+  }
+
+  const filterMatch = /^wordcard_(?:toeic_)?(flashcard|quiz|list)_status_filter_v1$/.exec(event.key || '');
+  if (filterMatch && event.key === prefix + filterMatch[1] + '_status_filter_v1') {
+    updateLearningFilterButtons(filterMatch[1]);
+    if (state.currentTab === filterMatch[1]) {
+      if (filterMatch[1] === 'flashcard') initFlashcard();
+      else if (filterMatch[1] === 'quiz') {
+        if (state.quizAnsweredGeneration !== state.quizGeneration) initQuiz();
+      } else renderList();
+    }
+  }
+});
