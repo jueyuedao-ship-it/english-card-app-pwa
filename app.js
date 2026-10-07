@@ -29,6 +29,8 @@ const state = {
   quizPageOrder: false,
   quizIndex: 0,
   quizOrder: [],
+  quizRunId: 0,
+  quizAnswerLocked: false,
   quizCorrect: 0,
   quizTotal: 0,
   listFilter: 'all',
@@ -55,27 +57,133 @@ function getFilteredWords(key) {
   return WORD_DATA.words.filter(w => pages.includes(w.page));
 }
 
+function getProgressMode() {
+  return localStorage.getItem('wordcard_study_mode') === 'toeic' ? 'toeic' : 'kosen';
+}
+
+function getProgressStoragePrefix() {
+  return getProgressMode() === 'toeic' ? 'wordcard_toeic_' : 'wordcard_';
+}
+
+function readStoredArray(key) {
+  try {
+    const value = JSON.parse(localStorage.getItem(key) || '[]');
+    return Array.isArray(value) ? value : [];
+  } catch {
+    return [];
+  }
+}
+
+function getWordStatusStore() {
+  const prefix = getProgressStoragePrefix();
+  const key = prefix + 'status_v1';
+  const saved = localStorage.getItem(key);
+  if (saved) {
+    try {
+      const parsed = JSON.parse(saved);
+      if (parsed && parsed.version === 1 && parsed.entries && typeof parsed.entries === 'object' && !Array.isArray(parsed.entries)) {
+        parsed.legacy = parsed.legacy && typeof parsed.legacy === 'object' ? parsed.legacy : { mastery: [], known: [], unknown: [] };
+        return parsed;
+      }
+    } catch {
+      // A malformed new-format value falls back to the legacy arrays below.
+    }
+  }
+
+  const legacy = {
+    mastery: readStoredArray(prefix + 'mastery'),
+    known: readStoredArray(prefix + 'known'),
+    unknown: readStoredArray(prefix + 'unknown'),
+  };
+  const entries = {};
+  [...legacy.mastery, ...legacy.known].forEach(id => { entries[id] = 'perfect'; });
+  // There are no timestamps in the old format. Keep the review-needed result
+  // when the old sets conflict, and retain all original arrays in `legacy`.
+  legacy.unknown.forEach(id => { entries[id] = 'anxious'; });
+
+  const migrated = { version: 1, entries, legacy };
+  localStorage.setItem(key, JSON.stringify(migrated));
+  return migrated;
+}
+
+function getWordStatuses() {
+  const store = getWordStatusStore();
+  const perfect = new Set();
+  const anxious = new Set();
+  Object.entries(store.entries).forEach(([id, status]) => {
+    if (status === 'perfect') perfect.add(id);
+    if (status === 'anxious') anxious.add(id);
+  });
+  return { perfect, anxious };
+}
+
+function getWordStatus(wordOrId) {
+  const id = typeof wordOrId === 'string' ? wordOrId : wordOrId?.id || wordOrId?.word;
+  if (!id) return null;
+  const status = getWordStatusStore().entries[id];
+  return status === 'perfect' || status === 'anxious' ? status : null;
+}
+
+function getWordStatusFromSets(wordOrId, statuses) {
+  const id = typeof wordOrId === 'string' ? wordOrId : wordOrId?.id || wordOrId?.word;
+  if (!id) return null;
+  if (statuses.perfect.has(id)) return 'perfect';
+  if (statuses.anxious.has(id)) return 'anxious';
+  return null;
+}
+
+function syncLegacyProgress(store) {
+  const prefix = getProgressStoragePrefix();
+  const perfect = Object.entries(store.entries).filter(([, status]) => status === 'perfect').map(([id]) => id);
+  const anxious = Object.entries(store.entries).filter(([, status]) => status === 'anxious').map(([id]) => id);
+  localStorage.setItem(prefix + 'mastery', JSON.stringify(perfect));
+  localStorage.setItem(prefix + 'known', JSON.stringify(perfect));
+  localStorage.setItem(prefix + 'unknown', JSON.stringify(anxious));
+}
+
+function persistWordStatusStore(store) {
+  const key = getProgressStoragePrefix() + 'status_v1';
+  localStorage.setItem(key, JSON.stringify(store));
+  syncLegacyProgress(store);
+  const statuses = getWordStatuses();
+  state.flashcardKnown = statuses.perfect;
+  state.flashcardUnknown = statuses.anxious;
+}
+
+function setWordStatus(wordOrId, status) {
+  const id = typeof wordOrId === 'string' ? wordOrId : wordOrId?.id || wordOrId?.word;
+  if (!id || ![null, 'perfect', 'anxious'].includes(status)) return;
+  const store = getWordStatusStore();
+  if (status === null) delete store.entries[id];
+  else store.entries[id] = status;
+  persistWordStatusStore(store);
+}
+
 function getMastery() {
-  const saved = localStorage.getItem('wordcard_mastery');
-  if (!saved) return new Set();
-  const parsed = JSON.parse(saved);
-  return parsed instanceof Set ? parsed : new Set(parsed);
+  return getWordStatuses().perfect;
 }
 function setMastery(set) {
-  localStorage.setItem('wordcard_mastery', JSON.stringify([...set]));
+  const perfect = new Set(set);
+  const store = getWordStatusStore();
+  Object.keys(store.entries).forEach(id => {
+    if (store.entries[id] === 'perfect') delete store.entries[id];
+  });
+  perfect.forEach(id => { store.entries[id] = 'perfect'; });
+  persistWordStatusStore(store);
 }
 
 function getFlashcardStats() {
-  const known = localStorage.getItem('wordcard_known');
-  const unknown = localStorage.getItem('wordcard_unknown');
-  return {
-    known: known ? new Set(JSON.parse(known)) : new Set(),
-    unknown: unknown ? new Set(JSON.parse(unknown)) : new Set(),
-  };
+  const statuses = getWordStatuses();
+  return { known: statuses.perfect, unknown: statuses.anxious };
 }
 function setFlashcardStats(known, unknown) {
-  localStorage.setItem('wordcard_known', JSON.stringify([...known]));
-  localStorage.setItem('wordcard_unknown', JSON.stringify([...unknown]));
+  const store = getWordStatusStore();
+  const ids = new Set([...known, ...unknown]);
+  ids.forEach(id => {
+    if (unknown.has(id)) store.entries[id] = 'anxious';
+    else store.entries[id] = 'perfect';
+  });
+  persistWordStatusStore(store);
 }
 
 // ============ PAGE FILTER ============
@@ -201,10 +309,6 @@ function initFlashcard() {
 }
 
 function toggleShuffle() {
-  state.flashcardKnown.clear();
-  state.flashcardUnknown.clear();
-  localStorage.removeItem('wordcard_known');
-  localStorage.removeItem('wordcard_unknown');
   state.flashcardMode = 'shuffle';
   state.flashcardIndex = 0;
   state.flashcardFlipped = false;
@@ -219,10 +323,6 @@ function toggleShuffle() {
 }
 
 function togglePageOrder() {
-  state.flashcardKnown.clear();
-  state.flashcardUnknown.clear();
-  localStorage.removeItem('wordcard_known');
-  localStorage.removeItem('wordcard_unknown');
   state.flashcardMode = 'page';
   state.flashcardIndex = 0;
   state.flashcardFlipped = false;
@@ -260,12 +360,8 @@ function flipCard() {
 
 function markCard(known) {
   const word = state.flashcardOrder[state.flashcardIndex];
-  if (known) {
-    state.flashcardKnown.add(word.word);
-  } else {
-    state.flashcardUnknown.add(word.word);
-  }
-  setFlashcardStats(state.flashcardKnown, state.flashcardUnknown);
+  if (!word) return;
+  setWordStatus(word, known ? 'perfect' : 'anxious');
 
   if (state.flashcardIndex < state.flashcardOrder.length - 1) {
     state.flashcardIndex++;
@@ -288,6 +384,8 @@ function isAppendix(word) {
 }
 
 function initQuiz() {
+  state.quizRunId++;
+  state.quizAnswerLocked = false;
   state.quizIndex = 0;
   if (state.quizShuffle) {
     state.quizOrder = shuffle(getFilteredWords('quiz'));
@@ -302,6 +400,7 @@ function initQuiz() {
 }
 
 function showQuiz() {
+  state.quizAnswerLocked = false;
   if (state.quizOrder.length === 0) {
     document.getElementById('quizResult').textContent = '選択されたページの単語がありません';
     document.getElementById('quizWord').textContent = '選択してください';
@@ -341,8 +440,12 @@ function showQuiz() {
 }
 
 function checkQuiz(btn, selected, correct) {
+  if (state.quizAnswerLocked) return;
+  state.quizAnswerLocked = true;
+  const runId = state.quizRunId;
   const buttons = document.querySelectorAll('#quizOptions .quiz-option');
   buttons.forEach(b => {
+    b.disabled = true;
     b.classList.add('disabled');
     if (b.textContent === correct) b.classList.add('correct');
   });
@@ -355,13 +458,14 @@ function checkQuiz(btn, selected, correct) {
   }
   state.quizTotal++;
 
-  if (selected === correct) state.flashcardKnown.add(state.quizOrder[state.quizIndex].word);
-  else state.flashcardUnknown.add(state.quizOrder[state.quizIndex].word);
+  const current = state.quizOrder[state.quizIndex];
+  if (current) setWordStatus(current, selected === correct ? 'perfect' : 'anxious');
 
   document.getElementById('quizResult').textContent = selected === correct ? '正解！' : `不正解 😅 正解は ${correct}`;
   updateProgressInfo();
 
   setTimeout(() => {
+    if (state.quizRunId !== runId) return;
     state.quizIndex++;
     showQuiz();
   }, 1200);
@@ -400,7 +504,7 @@ function toggleQuizPageOrder() {
 
 // ============ LIST ============
 function renderList() {
-  const mastery = getMastery();
+  const statuses = getWordStatuses();
   let filtered = getFilteredWords('list');
 
   if (state.listSearch) {
@@ -408,17 +512,21 @@ function renderList() {
     filtered = filtered.filter(w => w.word.toLowerCase().includes(s) || w.meaning.includes(s));
   }
 
-  if (state.listFilter === 'done') filtered = filtered.filter(w => mastery.has(w.word));
-  if (state.listFilter === 'undone') filtered = filtered.filter(w => !mastery.has(w.word));
+  if (state.listFilter !== 'all') {
+    const expected = state.listFilter === 'untried' ? null : state.listFilter;
+    filtered = filtered.filter(word => getWordStatusFromSets(word, statuses) === expected);
+  }
 
   document.getElementById('listStats').textContent = `${filtered.length}語中表示`;
 
   const tbody = document.getElementById('wordTableBody');
   tbody.innerHTML = '';
   filtered.forEach(w => {
-    const done = mastery.has(w.word);
+    const id = w.id || w.word;
+    const status = getWordStatusFromSets(id, statuses);
     const tr = document.createElement('tr');
-    if (done) tr.className = 'mastery-done';
+    if (status === 'perfect') tr.className = 'mastery-done';
+    if (status === 'anxious') tr.className = 'mastery-anxious';
 
     const isApp = isAppendix(w);
     const td1 = document.createElement('td');
@@ -431,12 +539,7 @@ function renderList() {
     const td3 = document.createElement('td');
     td3.textContent = 'p.' + w.page;
 
-    const td4 = document.createElement('td');
-    const span = document.createElement('span');
-    span.className = 'mastery-toggle ' + (done ? 'done' : '');
-    span.textContent = done ? '★' : '☆';
-    span._word = w.word; // Store directly, avoids HTML attribute parsing issues
-    td4.appendChild(span);
+    const td4 = createWordStatusCell(w, status);
 
     tr.appendChild(td1);
     tr.appendChild(td2);
@@ -453,42 +556,62 @@ function filterList() {
 
 function setFilter(filter, btn) {
   state.listFilter = filter;
-  document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('#panel-list .list-toolbar .filter-btn').forEach(b => b.classList.remove('active'));
   btn.classList.add('active');
   renderList();
 }
 
 function toggleMastery(word, el) {
-  const mastery = getMastery();
-  if (mastery.has(word)) {
-    mastery.delete(word);
-    el.classList.remove('done');
-    el.textContent = '☆';
-    el.closest('tr').classList.remove('mastery-done');
-  } else {
-    mastery.add(word);
-    el.classList.add('done');
-    el.textContent = '★';
-    el.closest('tr').classList.add('mastery-done');
-  }
-  setMastery(mastery);
+  setWordStatus(word, getWordStatus(word) === 'perfect' ? null : 'perfect');
+  renderList();
   updateProgressInfo();
 }
 
-// Event delegation for mastery toggles (uses element property, not data attribute)
+function createWordStatusCell(word, status = getWordStatus(word)) {
+  const id = word.id || word.word;
+  const cell = document.createElement('td');
+  cell.className = 'word-status-cell';
+  const group = document.createElement('div');
+  group.className = 'word-status-options';
+  group.setAttribute('role', 'group');
+  group.setAttribute('aria-label', `${word.word} の学習状態`);
+
+  [['perfect', '完璧'], ['anxious', '不安'], ['untried', '未挑戦']].forEach(([value, label]) => {
+    const button = document.createElement('button');
+    const selected = value === 'untried' ? status === null : status === value;
+    button.type = 'button';
+    button.className = `word-status-option word-status-${value}` + (selected ? ' active' : '');
+    button.dataset.wordStatus = value;
+    button.setAttribute('aria-pressed', selected ? 'true' : 'false');
+    button.textContent = label;
+    button._word = id;
+    group.appendChild(button);
+  });
+
+  cell.appendChild(group);
+  return cell;
+}
+
+// Event delegation keeps list controls working after each filter render.
 document.addEventListener('click', (e) => {
-  const toggle = e.target.closest('.mastery-toggle');
+  const toggle = e.target.closest('[data-word-status]');
   if (toggle && toggle._word) {
-    toggleMastery(toggle._word, toggle);
+    setWordStatus(toggle._word, toggle.dataset.wordStatus === 'untried' ? null : toggle.dataset.wordStatus);
+    renderList();
+    updateProgressInfo();
   }
 });
 
 // ============ PROGRESS EXPORT/IMPORT ============
 function exportProgress() {
+  const statuses = getWordStatuses();
+  const store = getWordStatusStore();
   const data = {
-    mastery: [...getMastery()],
-    flashcardKnown: [...state.flashcardKnown],
-    flashcardUnknown: [...state.flashcardUnknown],
+    mode: getProgressMode(),
+    mastery: [...statuses.perfect],
+    flashcardKnown: [...statuses.perfect],
+    flashcardUnknown: [...statuses.anxious],
+    wordStatuses: { version: 1, entries: { ...store.entries }, legacy: store.legacy },
     quizCorrect: state.quizCorrect,
     quizTotal: state.quizTotal,
     exportedAt: new Date().toISOString(),
@@ -509,10 +632,52 @@ function importProgress(event) {
   reader.onload = (e) => {
     try {
       const data = JSON.parse(e.target.result);
-      if (data.mastery) setMastery(new Set(data.mastery));
-      if (data.flashcardKnown) state.flashcardKnown = new Set(data.flashcardKnown);
-      if (data.flashcardUnknown) state.flashcardUnknown = new Set(data.flashcardUnknown);
-      if (data.flashcardKnown) setFlashcardStats(new Set(data.flashcardKnown), new Set(data.flashcardUnknown || []));
+      if (!data || typeof data !== 'object' || Array.isArray(data)) throw new Error('Invalid backup object');
+      const mode = getProgressMode();
+      if (data.mode !== undefined && (!['kosen', 'toeic'].includes(data.mode) || data.mode !== mode)) {
+        throw new Error('Backup belongs to a different study mode');
+      }
+      const validIds = new Set(WORD_DATA.words.map(word => word.id || word.word));
+      const isValidId = id => typeof id === 'string' && validIds.has(id);
+
+      let entries;
+      let legacy;
+      if (Object.prototype.hasOwnProperty.call(data, 'wordStatuses')) {
+        const source = data.wordStatuses;
+        if (data.mode !== mode || !source || source.version !== 1 || !source.entries || typeof source.entries !== 'object' || Array.isArray(source.entries)) {
+          throw new Error('Invalid status backup');
+        }
+        if (Object.entries(source.entries).some(([id, status]) => !isValidId(id) || (status !== 'perfect' && status !== 'anxious'))) {
+          throw new Error('Invalid status value');
+        }
+        if (source.legacy !== undefined && (!source.legacy || typeof source.legacy !== 'object' || Array.isArray(source.legacy))) {
+          throw new Error('Invalid legacy history');
+        }
+        entries = Object.create(null);
+        Object.entries(source.entries).forEach(([id, status]) => { entries[id] = status; });
+        legacy = { mastery: [], known: [], unknown: [] };
+        ['mastery', 'known', 'unknown'].forEach(field => {
+          const values = source.legacy?.[field] ?? [];
+          if (!Array.isArray(values) || values.some(id => !isValidId(id))) throw new Error('Invalid archived progress');
+          legacy[field] = values;
+        });
+      } else {
+        const legacyFields = ['mastery', 'flashcardKnown', 'flashcardUnknown'];
+        if (!legacyFields.some(field => Object.prototype.hasOwnProperty.call(data, field)) ||
+            legacyFields.some(field => Object.prototype.hasOwnProperty.call(data, field) && !Array.isArray(data[field]))) {
+          throw new Error('Unsupported backup format');
+        }
+        const mastery = Array.isArray(data.mastery) ? data.mastery : [];
+        const known = Array.isArray(data.flashcardKnown) ? data.flashcardKnown : [];
+        const unknown = Array.isArray(data.flashcardUnknown) ? data.flashcardUnknown : [];
+        if ([...mastery, ...known, ...unknown].some(id => !isValidId(id))) throw new Error('Backup contains words from another mode');
+        entries = Object.create(null);
+        [...mastery, ...known].forEach(id => { entries[id] = 'perfect'; });
+        unknown.forEach(id => { entries[id] = 'anxious'; });
+        legacy = { mastery, known, unknown };
+      }
+
+      persistWordStatusStore({ version: 1, entries, legacy });
       updateProgressInfo();
       renderList();
       alert('進捗データをインポートしました！');

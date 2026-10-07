@@ -27,10 +27,6 @@
   const original = {
     getPageFilter,
     setPageFilter,
-    getMastery,
-    setMastery,
-    getFlashcardStats,
-    setFlashcardStats,
     setupPageFilter,
     savePageFilter,
     selectAllPages,
@@ -78,30 +74,6 @@
   setPageFilter = function(key, pages) {
     if (!isToeicMode()) return original.setPageFilter(key, pages);
     localStorage.setItem(TOEIC_PREFIX + 'page_filter_' + key, JSON.stringify(pages));
-  };
-
-  getMastery = function() {
-    if (!isToeicMode()) return original.getMastery();
-    return parseStoredSet(TOEIC_PREFIX + 'mastery');
-  };
-
-  setMastery = function(set) {
-    if (!isToeicMode()) return original.setMastery(set);
-    localStorage.setItem(TOEIC_PREFIX + 'mastery', JSON.stringify([...set]));
-  };
-
-  getFlashcardStats = function() {
-    if (!isToeicMode()) return original.getFlashcardStats();
-    return {
-      known: parseStoredSet(TOEIC_PREFIX + 'known'),
-      unknown: parseStoredSet(TOEIC_PREFIX + 'unknown'),
-    };
-  };
-
-  setFlashcardStats = function(known, unknown) {
-    if (!isToeicMode()) return original.setFlashcardStats(known, unknown);
-    localStorage.setItem(TOEIC_PREFIX + 'known', JSON.stringify([...known]));
-    localStorage.setItem(TOEIC_PREFIX + 'unknown', JSON.stringify([...unknown]));
   };
 
   function getDefaultToeicFilter(key) {
@@ -308,9 +280,6 @@
   toggleShuffle = function() {
     if (!isToeicMode()) return original.toggleShuffle();
 
-    state.flashcardKnown.clear();
-    state.flashcardUnknown.clear();
-    setFlashcardStats(state.flashcardKnown, state.flashcardUnknown);
     state.flashcardMode = 'shuffle';
     state.flashcardIndex = 0;
     state.flashcardFlipped = false;
@@ -328,9 +297,6 @@
   togglePageOrder = function() {
     if (!isToeicMode()) return original.togglePageOrder();
 
-    state.flashcardKnown.clear();
-    state.flashcardUnknown.clear();
-    setFlashcardStats(state.flashcardKnown, state.flashcardUnknown);
     state.flashcardMode = 'page';
     state.flashcardIndex = 0;
     state.flashcardFlipped = false;
@@ -374,15 +340,7 @@
     const word = state.flashcardOrder[state.flashcardIndex];
     if (!word) return;
 
-    const key = word.id;
-    if (known) {
-      state.flashcardKnown.add(key);
-      state.flashcardUnknown.delete(key);
-    } else {
-      state.flashcardUnknown.add(key);
-      state.flashcardKnown.delete(key);
-    }
-    setFlashcardStats(state.flashcardKnown, state.flashcardUnknown);
+    setWordStatus(word, known ? 'perfect' : 'anxious');
 
     if (state.flashcardIndex < state.flashcardOrder.length - 1) {
       state.flashcardIndex++;
@@ -395,9 +353,13 @@
 
   checkQuiz = function(btn, selected, correct) {
     if (!isToeicMode()) return original.checkQuiz(btn, selected, correct);
+    if (state.quizAnswerLocked) return;
+    state.quizAnswerLocked = true;
+    const runId = state.quizRunId;
 
     const buttons = document.querySelectorAll('#quizOptions .quiz-option');
     buttons.forEach(button => {
+      button.disabled = true;
       button.classList.add('disabled');
       if (button.textContent === correct) button.classList.add('correct');
     });
@@ -412,22 +374,14 @@
     state.quizTotal++;
 
     const current = state.quizOrder[state.quizIndex];
-    if (current) {
-      if (isCorrect) {
-        state.flashcardKnown.add(current.id);
-        state.flashcardUnknown.delete(current.id);
-      } else {
-        state.flashcardUnknown.add(current.id);
-        state.flashcardKnown.delete(current.id);
-      }
-      setFlashcardStats(state.flashcardKnown, state.flashcardUnknown);
-    }
+    if (current) setWordStatus(current, isCorrect ? 'perfect' : 'anxious');
 
     document.getElementById('quizResult').textContent =
       isCorrect ? '正解！' : `不正解 😅 正解は ${correct}`;
     updateProgressInfo();
 
     setTimeout(() => {
+      if (state.quizRunId !== runId) return;
       state.quizIndex++;
       showQuiz();
     }, 1200);
@@ -441,7 +395,7 @@
   renderList = function() {
     if (!isToeicMode()) return original.renderList();
 
-    const mastery = getMastery();
+    const statuses = getWordStatuses();
     let filtered = getFilteredWords('list');
 
     if (state.listSearch) {
@@ -452,11 +406,9 @@
       );
     }
 
-    if (state.listFilter === 'done') {
-      filtered = filtered.filter(item => mastery.has(item.id));
-    }
-    if (state.listFilter === 'undone') {
-      filtered = filtered.filter(item => !mastery.has(item.id));
+    if (state.listFilter !== 'all') {
+      const expected = state.listFilter === 'untried' ? null : state.listFilter;
+      filtered = filtered.filter(item => getWordStatusFromSets(item.id, statuses) === expected);
     }
 
     document.getElementById('listStats').textContent =
@@ -467,9 +419,10 @@
 
     const fragment = document.createDocumentFragment();
     filtered.forEach(item => {
-      const done = mastery.has(item.id);
+      const status = getWordStatusFromSets(item.id, statuses);
       const row = document.createElement('tr');
-      if (done) row.className = 'mastery-done';
+      if (status === 'perfect') row.className = 'mastery-done';
+      if (status === 'anxious') row.className = 'mastery-anxious';
 
       const wordCell = document.createElement('td');
       wordCell.className = 'word-cell';
@@ -490,17 +443,12 @@
       const levelCell = document.createElement('td');
       levelCell.textContent = `${item.cefr} / ${item.priority}`;
 
-      const masteryCell = document.createElement('td');
-      const toggle = document.createElement('span');
-      toggle.className = 'mastery-toggle ' + (done ? 'done' : '');
-      toggle.textContent = done ? '★' : '☆';
-      toggle._word = item.id;
-      masteryCell.appendChild(toggle);
+      const statusCell = createWordStatusCell(item, status);
 
       row.appendChild(wordCell);
       row.appendChild(meaningCell);
       row.appendChild(levelCell);
-      row.appendChild(masteryCell);
+      row.appendChild(statusCell);
       fragment.appendChild(row);
     });
 
@@ -591,6 +539,8 @@
     state.flashcardUnknown = new Set();
     state.quizIndex = 0;
     state.quizOrder = [];
+    state.quizRunId++;
+    state.quizAnswerLocked = false;
     state.quizCorrect = 0;
     state.quizTotal = 0;
     state.listFilter = 'all';

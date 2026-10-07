@@ -78,9 +78,14 @@ body { font-family: 'Hiragino Sans', 'Hiragino Kaku Gothic ProN', 'Noto Sans JP'
 .word-table td { padding: 8px 10px; border-bottom: 1px solid #f0f0f0; font-size: 0.8em; }
 .word-table tr:hover td { background: #f8f8ff; }
 .word-table .mastery-done td { background: #d3f9d8; }
+.word-table .mastery-anxious td { background: #fff3d1; }
 .word-table .word-cell { font-weight: 500; color: #2d3436; font-size: 0.85em; }
-.mastery-toggle { cursor: pointer; color: #ccc; font-size: 1em; min-height: 32px; display: flex; align-items: center; }
-.mastery-toggle.done { color: #51cf66; }
+.word-status-options { display: flex; flex-wrap: wrap; gap: 4px; }
+.word-status-option { min-height: 32px; padding: 4px 7px; border: 1px solid #ddd; border-radius: 999px; background: #fff; color: #555; cursor: pointer; font-size: 0.72em; white-space: nowrap; }
+.word-status-option:focus-visible { outline: 2px solid #667eea; outline-offset: 2px; }
+.word-status-perfect.active { border-color: #37a94a; background: #d3f9d8; color: #176b27; }
+.word-status-anxious.active { border-color: #d59a18; background: #fff3d1; color: #805600; }
+.word-status-untried.active { border-color: #667eea; background: #eef0ff; color: #39479e; }
 .table-wrapper { padding: 0 12px 12px; overflow-x: auto; }
 .card-modes { display: flex; gap: 8px; justify-content: center; margin-top: 8px; }
 
@@ -172,21 +177,23 @@ body { font-family: 'Hiragino Sans', 'Hiragino Kaku Gothic ProN', 'Noto Sans JP'
   }
 
   .toeic-mode .word-table th:nth-child(1),
-  .toeic-mode .word-table td:nth-child(1) { width: 23%; }
+  .toeic-mode .word-table td:nth-child(1) { width: 20%; }
+  .toeic-mode .word-table th:nth-child(1) { width: 20%; }
 
   .toeic-mode .word-table th:nth-child(2),
   .toeic-mode .word-table td:nth-child(2) {
-    width: 47%;
+    width: 34%;
     white-space: normal;
     overflow-wrap: anywhere;
     word-break: break-word;
   }
 
   .toeic-mode .word-table th:nth-child(3),
-  .toeic-mode .word-table td:nth-child(3) { width: 20%; }
+  .toeic-mode .word-table td:nth-child(3) { width: 16%; }
 
   .toeic-mode .word-table th:nth-child(4),
-  .toeic-mode .word-table td:nth-child(4) { width: 10%; }
+  .toeic-mode .word-table td:nth-child(4) { width: 30%; }
+  .toeic-mode .word-table th:nth-child(4) { width: 30%; }
 }
 
 

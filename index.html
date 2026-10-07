@@ -131,13 +131,14 @@
   <div class="list-toolbar">
     <input class="search-input" type="text" id="searchInput" placeholder="英単語・和訳で検索..." oninput="filterList()">
     <button class="filter-btn active" onclick="setFilter('all', this)">全部</button>
-    <button class="filter-btn" onclick="setFilter('done', this)">完璧済</button>
-    <button class="filter-btn" onclick="setFilter('undone', this)">未完璧</button>
+    <button class="filter-btn" onclick="setFilter('perfect', this)">完璧</button>
+    <button class="filter-btn" onclick="setFilter('anxious', this)">不安</button>
+    <button class="filter-btn" onclick="setFilter('untried', this)">未挑戦</button>
   </div>
   <div class="list-stats" id="listStats"></div>
   <div class="table-wrapper">
     <table class="word-table" id="wordTable">
-      <thead><tr><th>英単語</th><th>和訳</th><th>ページ</th><th>完璧</th></tr></thead>
+      <thead><tr><th>英単語</th><th>和訳</th><th>ページ</th><th>状態</th></tr></thead>
       <tbody id="wordTableBody"></tbody>
     </table>
   </div>

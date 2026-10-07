@@ -26,8 +26,8 @@ async function main() {
     const words = await page.evaluate(() => WORD_DATA.words);
     assert.equal(words.length, 5021);
     assert.ok(words.every((word, index) => word.id === `toeic-${index + 1}` && word.rank === index + 1 && word.pos && word.headword && word.phonetic));
-    assert.deepEqual(await page.evaluate(() => [...getMastery()]), ['toeic-66', 'toeic-2577']);
-    assert.deepEqual(await page.evaluate(() => [...getFlashcardStats().known]), ['toeic-594']);
+    assert.deepEqual(await page.evaluate(() => [...getMastery()].sort()), ['toeic-2577', 'toeic-594', 'toeic-66'].sort());
+    assert.deepEqual(await page.evaluate(() => [...getFlashcardStats().known].sort()), ['toeic-2577', 'toeic-594', 'toeic-66'].sort());
     assert.deepEqual(await page.evaluate(() => [...getFlashcardStats().unknown]), ['toeic-1811']);
 
     await page.getByRole('button', { name: '全単語リスト', exact: true }).click();
@@ -38,9 +38,9 @@ async function main() {
     await page.locator('#searchInput').fill('man');
     assert.match(await rowFor('man').locator('td').nth(1).innerText(), /男性|男の人/);
     assert.match(await rowFor('man').locator('.word-phonetic').innerText(), /^\/.+\/$/);
-    assert.equal(await rowFor('man').locator('.mastery-toggle').innerText(), '★');
-    await rowFor('man').locator('.mastery-toggle').click();
-    assert.equal(await rowFor('man').locator('.mastery-toggle').innerText(), '☆');
+    assert.equal(await rowFor('man').locator('[data-word-status="perfect"]').getAttribute('aria-pressed'), 'true');
+    await rowFor('man').locator('[data-word-status="anxious"]').click();
+    assert.equal(await rowFor('man').locator('[data-word-status="anxious"]').getAttribute('aria-pressed'), 'true');
     await page.locator('#searchInput').fill('fine');
     const fineMeanings = await rowFor('fine').locator('td:nth-child(2)').allInnerTexts();
     assert.equal(fineMeanings.length, 2);
@@ -73,7 +73,7 @@ async function main() {
 
     await page.reload();
     await page.waitForFunction(() => document.body.classList.contains('toeic-mode') && !document.getElementById('appShell').hidden);
-    assert.equal(await page.evaluate(() => getMastery().has('toeic-66')), false);
+    assert.equal(await page.evaluate(() => getMastery().has('toeic-66')), true);
     assert.equal(await page.evaluate(() => getMastery().has('toeic-2577')), true);
     assert.equal(await page.evaluate(() => getFlashcardStats().known.has('toeic-594')), true);
     assert.equal(await page.evaluate(() => getFlashcardStats().unknown.has('toeic-1811')), true);
@@ -90,7 +90,7 @@ async function main() {
 
     await page.evaluate(() => navigator.serviceWorker.ready);
     await page.waitForFunction(() => navigator.serviceWorker.controller);
-    assert.ok((await page.evaluate(() => caches.keys())).includes('english-vocab-pwa-v10'));
+    assert.ok((await page.evaluate(() => caches.keys())).includes('english-vocab-pwa-v11'));
     await context.setOffline(true);
     await page.reload();
     await page.waitForFunction(() => document.body.classList.contains('toeic-mode') && !document.getElementById('appShell').hidden);
