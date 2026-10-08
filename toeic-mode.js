@@ -49,7 +49,7 @@
   };
 
   function isToeicMode() {
-    return localStorage.getItem(MODE_KEY) === 'toeic';
+    return state.studyMode === 'toeic';
   }
 
   function parseStoredSet(key) {
@@ -80,29 +80,10 @@
     localStorage.setItem(TOEIC_PREFIX + 'page_filter_' + key, JSON.stringify(pages));
   };
 
-  getMastery = function() {
-    if (!isToeicMode()) return original.getMastery();
-    return parseStoredSet(TOEIC_PREFIX + 'mastery');
-  };
-
-  setMastery = function(set) {
-    if (!isToeicMode()) return original.setMastery(set);
-    localStorage.setItem(TOEIC_PREFIX + 'mastery', JSON.stringify([...set]));
-  };
-
-  getFlashcardStats = function() {
-    if (!isToeicMode()) return original.getFlashcardStats();
-    return {
-      known: parseStoredSet(TOEIC_PREFIX + 'known'),
-      unknown: parseStoredSet(TOEIC_PREFIX + 'unknown'),
-    };
-  };
-
-  setFlashcardStats = function(known, unknown) {
-    if (!isToeicMode()) return original.setFlashcardStats(known, unknown);
-    localStorage.setItem(TOEIC_PREFIX + 'known', JSON.stringify([...known]));
-    localStorage.setItem(TOEIC_PREFIX + 'unknown', JSON.stringify([...unknown]));
-  };
+  getMastery = function() { return original.getMastery(); };
+  setMastery = function(set) { return original.setMastery(set); };
+  getFlashcardStats = function() { return original.getFlashcardStats(); };
+  setFlashcardStats = function(known, unknown) { return original.setFlashcardStats(known, unknown); };
 
   function getDefaultToeicFilter(key) {
     const selectedPages = getPageFilter(key);
@@ -306,131 +287,23 @@
   };
 
   toggleShuffle = function() {
-    if (!isToeicMode()) return original.toggleShuffle();
-
-    state.flashcardKnown.clear();
-    state.flashcardUnknown.clear();
-    setFlashcardStats(state.flashcardKnown, state.flashcardUnknown);
-    state.flashcardMode = 'shuffle';
-    state.flashcardIndex = 0;
-    state.flashcardFlipped = false;
-    state.flashcardOrder = shuffle(getFilteredWords('flashcard'));
-
-    document.getElementById('shuffleBtn').classList.add('active');
-    document.getElementById('pageOrderBtn').classList.remove('active');
-    showFlashcard();
-
-    setTimeout(() => {
-      document.getElementById('shuffleBtn').classList.remove('active');
-    }, 200);
+    return original.toggleShuffle();
   };
 
   togglePageOrder = function() {
-    if (!isToeicMode()) return original.togglePageOrder();
-
-    state.flashcardKnown.clear();
-    state.flashcardUnknown.clear();
-    setFlashcardStats(state.flashcardKnown, state.flashcardUnknown);
-    state.flashcardMode = 'page';
-    state.flashcardIndex = 0;
-    state.flashcardFlipped = false;
-    state.flashcardOrder = getFilteredWords('flashcard');
-
-    document.getElementById('pageOrderBtn').classList.add('active');
-    document.getElementById('shuffleBtn').classList.remove('active');
-    showFlashcard();
-
-    setTimeout(() => {
-      document.getElementById('pageOrderBtn').classList.remove('active');
-    }, 200);
+    return original.togglePageOrder();
   };
 
   showFlashcard = function() {
-    if (!isToeicMode()) return original.showFlashcard();
-
-    const word = state.flashcardOrder[state.flashcardIndex];
-    if (!word) return;
-
-    const card = document.getElementById('flashcard');
-    card.classList.remove('card-flipped');
-    state.flashcardFlipped = false;
-
-    document.getElementById('flashcardWord').textContent = word.word;
-    document.getElementById('flashcardMeaning').textContent = word.meaning;
-    document.getElementById('flashcardPage').textContent =
-      `CEFR ${word.cefr} / #${word.rank} / ${word.priority}`;
-
-    const known = state.flashcardKnown.size;
-    const unknown = state.flashcardUnknown.size;
-    const total = state.flashcardOrder.length;
-    const progress = state.flashcardIndex + 1;
-    document.getElementById('flashcardStats').textContent =
-      `${progress}/${total} | 知っていた: ${known} | 知っていなかった: ${unknown}`;
+    return original.showFlashcard();
   };
 
   markCard = function(known) {
-    if (!isToeicMode()) return original.markCard(known);
-
-    const word = state.flashcardOrder[state.flashcardIndex];
-    if (!word) return;
-
-    const key = word.id;
-    if (known) {
-      state.flashcardKnown.add(key);
-      state.flashcardUnknown.delete(key);
-    } else {
-      state.flashcardUnknown.add(key);
-      state.flashcardKnown.delete(key);
-    }
-    setFlashcardStats(state.flashcardKnown, state.flashcardUnknown);
-
-    if (state.flashcardIndex < state.flashcardOrder.length - 1) {
-      state.flashcardIndex++;
-      showFlashcard();
-    } else {
-      document.getElementById('flashcardStats').textContent = 'おめでとうございます！全語完了！';
-    }
-    updateProgressInfo();
+    return original.markCard(known);
   };
 
-  checkQuiz = function(btn, selected, correct) {
-    if (!isToeicMode()) return original.checkQuiz(btn, selected, correct);
-
-    const buttons = document.querySelectorAll('#quizOptions .quiz-option');
-    buttons.forEach(button => {
-      button.classList.add('disabled');
-      if (button.textContent === correct) button.classList.add('correct');
-    });
-
-    const isCorrect = selected === correct;
-    if (isCorrect) {
-      btn.classList.add('correct');
-      state.quizCorrect++;
-    } else {
-      btn.classList.add('wrong');
-    }
-    state.quizTotal++;
-
-    const current = state.quizOrder[state.quizIndex];
-    if (current) {
-      if (isCorrect) {
-        state.flashcardKnown.add(current.id);
-        state.flashcardUnknown.delete(current.id);
-      } else {
-        state.flashcardUnknown.add(current.id);
-        state.flashcardKnown.delete(current.id);
-      }
-      setFlashcardStats(state.flashcardKnown, state.flashcardUnknown);
-    }
-
-    document.getElementById('quizResult').textContent =
-      isCorrect ? '正解！' : `不正解 😅 正解は ${correct}`;
-    updateProgressInfo();
-
-    setTimeout(() => {
-      state.quizIndex++;
-      showQuiz();
-    }, 1200);
+  checkQuiz = function(...args) {
+    return original.checkQuiz(...args);
   };
 
   isAppendix = function(word) {
@@ -438,74 +311,7 @@
     return original.isAppendix(word);
   };
 
-  renderList = function() {
-    if (!isToeicMode()) return original.renderList();
-
-    const mastery = getMastery();
-    let filtered = getFilteredWords('list');
-
-    if (state.listSearch) {
-      const search = state.listSearch.toLowerCase();
-      filtered = filtered.filter(item =>
-        item.word.toLowerCase().includes(search) ||
-        item.meaning.toLowerCase().includes(search)
-      );
-    }
-
-    if (state.listFilter === 'done') {
-      filtered = filtered.filter(item => mastery.has(item.id));
-    }
-    if (state.listFilter === 'undone') {
-      filtered = filtered.filter(item => !mastery.has(item.id));
-    }
-
-    document.getElementById('listStats').textContent =
-      `${filtered.length} / ${WORD_DATA.words.length}語を表示`;
-
-    const tbody = document.getElementById('wordTableBody');
-    tbody.innerHTML = '';
-
-    const fragment = document.createDocumentFragment();
-    filtered.forEach(item => {
-      const done = mastery.has(item.id);
-      const row = document.createElement('tr');
-      if (done) row.className = 'mastery-done';
-
-      const wordCell = document.createElement('td');
-      wordCell.className = 'word-cell';
-
-      const wordText = document.createElement('div');
-      wordText.textContent = item.word;
-
-      const phonetic = document.createElement('div');
-      phonetic.className = 'word-phonetic';
-      phonetic.textContent = item.phonetic;
-
-      wordCell.appendChild(wordText);
-      wordCell.appendChild(phonetic);
-
-      const meaningCell = document.createElement('td');
-      meaningCell.textContent = item.meaning;
-
-      const levelCell = document.createElement('td');
-      levelCell.textContent = `${item.cefr} / ${item.priority}`;
-
-      const masteryCell = document.createElement('td');
-      const toggle = document.createElement('span');
-      toggle.className = 'mastery-toggle ' + (done ? 'done' : '');
-      toggle.textContent = done ? '★' : '☆';
-      toggle._word = item.id;
-      masteryCell.appendChild(toggle);
-
-      row.appendChild(wordCell);
-      row.appendChild(meaningCell);
-      row.appendChild(levelCell);
-      row.appendChild(masteryCell);
-      fragment.appendChild(row);
-    });
-
-    tbody.appendChild(fragment);
-  };
+  renderList = function() { return original.renderList(); };
 
   function loadScript(src) {
     return new Promise((resolve, reject) => {
@@ -584,6 +390,7 @@
   function resetRuntimeState() {
     state.flashcardIndex = 0;
     state.flashcardOrder = [];
+    state.flashcardSeen = new Set();
     state.flashcardFlipped = false;
     state.flashcardShuffle = false;
     state.flashcardMode = null;
@@ -591,6 +398,9 @@
     state.flashcardUnknown = new Set();
     state.quizIndex = 0;
     state.quizOrder = [];
+    state.quizSeen = new Set();
+    state.quizGeneration++;
+    state.quizAnsweredGeneration = null;
     state.quizCorrect = 0;
     state.quizTotal = 0;
     state.listFilter = 'all';
@@ -632,6 +442,7 @@
       throw new Error('Unexpected CEFR level in TOEIC Bridge data.');
     }
 
+    state.studyMode = 'toeic';
     resetRuntimeState();
     setToeicLabels();
 
@@ -679,6 +490,7 @@
   }
 
   function activateKosen() {
+    state.studyMode = 'kosen';
     WORD_DATA.words = KOSEN_WORDS.map(item => ({ ...item }));
     resetRuntimeState();
     setKosenLabels();

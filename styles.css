@@ -68,6 +68,9 @@ body { font-family: 'Hiragino Sans', 'Hiragino Kaku Gothic ProN', 'Noto Sans JP'
 
 /* List */
 .list-toolbar { display: flex; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; }
+.status-filters { display: flex; align-items: center; gap: 5px; flex-wrap: wrap; margin: 4px 0 8px; }
+.status-filter-label { color: #666; font-size: .82em; margin-right: 2px; }
+.status-filters .filter-btn { padding: 6px 10px; min-height: 36px; }
 .search-input { padding: 12px 14px; border: 2px solid #e0e0e0; border-radius: 8px; font-size: 1em; flex: 1; min-width: 120px; min-height: 44px; }
 .search-input:focus { border-color: #667eea; outline: none; }
 .filter-btn { padding: 8px 14px; border: 1px solid #ddd; background: #fff; border-radius: 8px; cursor: pointer; font-size: 0.9em; min-height: 40px; }
@@ -77,10 +80,15 @@ body { font-family: 'Hiragino Sans', 'Hiragino Kaku Gothic ProN', 'Noto Sans JP'
 .word-table th { background: #f0f1ff; padding: 8px 10px; text-align: left; font-weight: 600; font-size: 0.75em; border-bottom: 2px solid #ddd; }
 .word-table td { padding: 8px 10px; border-bottom: 1px solid #f0f0f0; font-size: 0.8em; }
 .word-table tr:hover td { background: #f8f8ff; }
-.word-table .mastery-done td { background: #d3f9d8; }
+.word-table .learning-perfect td { background: #d3f9d8; }
+.word-table .learning-uncertain td { background: #fff3bf; }
 .word-table .word-cell { font-weight: 500; color: #2d3436; font-size: 0.85em; }
-.mastery-toggle { cursor: pointer; color: #ccc; font-size: 1em; min-height: 32px; display: flex; align-items: center; }
-.mastery-toggle.done { color: #51cf66; }
+.status-cell { min-width: 90px; }
+.status-tag { padding: 4px 6px; min-height: 28px; margin: 2px; border: 1px solid #d4d4dc; border-radius: 8px; background: #fff; color: #555; cursor: pointer; font: inherit; font-size: .75rem; line-height: 1.2; white-space: normal; }
+.status-tag-perfect.selected { background: #d3f9d8; border-color: #51cf66; color: #1d6b2a; font-weight: 600; }
+.status-tag-uncertain.selected { background: #fff3bf; border-color: #f0c24b; color: #765900; font-weight: 600; }
+.status-empty { display: inline-block; padding: 3px 4px; color: #777; font-size: .75rem; }
+.status-empty[hidden] { display: none; }
 .table-wrapper { padding: 0 12px 12px; overflow-x: auto; }
 .card-modes { display: flex; gap: 8px; justify-content: center; margin-top: 8px; }
 
@@ -172,21 +180,25 @@ body { font-family: 'Hiragino Sans', 'Hiragino Kaku Gothic ProN', 'Noto Sans JP'
   }
 
   .toeic-mode .word-table th:nth-child(1),
-  .toeic-mode .word-table td:nth-child(1) { width: 23%; }
+  .toeic-mode .word-table td:nth-child(1) { width: 20%; }
+  .toeic-mode .word-table th:nth-child(1) { width: 20%; }
 
   .toeic-mode .word-table th:nth-child(2),
   .toeic-mode .word-table td:nth-child(2) {
-    width: 47%;
+    width: 40%;
     white-space: normal;
     overflow-wrap: anywhere;
     word-break: break-word;
   }
 
   .toeic-mode .word-table th:nth-child(3),
-  .toeic-mode .word-table td:nth-child(3) { width: 20%; }
+  .toeic-mode .word-table td:nth-child(3) { width: 18%; }
 
   .toeic-mode .word-table th:nth-child(4),
-  .toeic-mode .word-table td:nth-child(4) { width: 10%; }
+  .toeic-mode .word-table td:nth-child(4) { width: 22%; }
+  .toeic-mode .word-table th:nth-child(4) { width: 22%; }
+  .toeic-mode .status-cell { min-width: 0; }
+  .toeic-mode .status-tag { padding: 4px 5px; margin: 1px; font-size: .75rem; }
 }
 
 
@@ -257,4 +269,3 @@ body { font-family: 'Hiragino Sans', 'Hiragino Kaku Gothic ProN', 'Noto Sans JP'
   line-height: 1.3;
   letter-spacing: .01em;
 }
-
