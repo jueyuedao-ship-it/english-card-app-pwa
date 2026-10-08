@@ -7,8 +7,9 @@ import { fileURLToPath } from 'node:url';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const observedPath = path.join(root, 'toeic-observed.js');
+const integrationPath = path.join(root, 'toeic-observed-integration.js');
 const entriesPath = path.join(root, 'data', 'toeic', 'entries.json');
-const toeicModePath = path.join(root, 'toeic-mode.js');
+const indexPath = path.join(root, 'index.html');
 const serviceWorkerPath = path.join(root, 'sw.js');
 
 const expected = [
@@ -82,12 +83,17 @@ test('uses stable observed IDs and does not invent CEFR, priority, or rank metad
   }
 });
 
-test('integrates the observed layer into TOEIC mode and the PWA cache', () => {
-  const toeicMode = fs.readFileSync(toeicModePath, 'utf8');
+test('loads and integrates the observed layer without changing the base TOEIC files', () => {
+  assert.ok(fs.existsSync(integrationPath), 'toeic-observed-integration.js must exist');
+  const integration = fs.readFileSync(integrationPath, 'utf8');
+  const index = fs.readFileSync(indexPath, 'utf8');
   const serviceWorker = fs.readFileSync(serviceWorkerPath, 'utf8');
 
-  assert.match(toeicMode, /toeic-observed\.js/);
-  assert.match(toeicMode, /TOEIC_BRIDGE_OBSERVED/);
-  assert.match(toeicMode, /実問題追加/);
+  assert.match(index, /toeic-observed\.js/);
+  assert.match(index, /toeic-observed-integration\.js/);
+  assert.match(integration, /TOEIC_BRIDGE_OBSERVED/);
+  assert.match(integration, /sourceCategory\s*===\s*['"]observed['"]/);
+  assert.match(integration, /実問題追加/);
   assert.match(serviceWorker, /toeic-observed\.js/);
+  assert.match(serviceWorker, /toeic-observed-integration\.js/);
 });
