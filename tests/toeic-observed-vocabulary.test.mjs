@@ -62,6 +62,15 @@ test('contains exactly the 28 TOEIC Bridge reading items selected from the suppl
   assert.deepEqual([...rows.map(row => row.word)].sort(), [...expected].sort());
 });
 
+test('keeps observed items separate from the CEFR-J base vocabulary', () => {
+  const entries = JSON.parse(fs.readFileSync(entriesPath, 'utf8'));
+  const baseWords = new Set(entries.map(entry => String(entry.word).toLowerCase()));
+
+  for (const word of expected) {
+    assert.equal(baseWords.has(word.toLowerCase()), false, `${word} must remain outside entries.json`);
+  }
+});
+
 test('uses stable observed IDs and does not invent CEFR, priority, or rank metadata', () => {
   const rows = loadObservedVocabulary();
   const ids = rows.map(row => row.id);
@@ -89,11 +98,14 @@ test('loads and integrates the observed layer without changing the base TOEIC fi
   const index = fs.readFileSync(indexPath, 'utf8');
   const serviceWorker = fs.readFileSync(serviceWorkerPath, 'utf8');
 
+  assert.doesNotThrow(() => new vm.Script(integration, { filename: integrationPath }));
+  assert.match(index, /5,021項目＋実問題追加28件/);
   assert.match(index, /toeic-observed\.js/);
   assert.match(index, /toeic-observed-integration\.js/);
   assert.match(integration, /TOEIC_BRIDGE_OBSERVED/);
   assert.match(integration, /sourceCategory\s*===\s*['"]observed['"]/);
   assert.match(integration, /実問題追加/);
+  assert.match(serviceWorker, /CACHE_NAME\s*=\s*CACHE_PREFIX\s*\+\s*['"]v12['"]/);
   assert.match(serviceWorker, /toeic-observed\.js/);
   assert.match(serviceWorker, /toeic-observed-integration\.js/);
 });
