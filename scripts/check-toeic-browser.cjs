@@ -22,17 +22,26 @@ async function main() {
       localStorage.setItem('wordcard_toeic_unknown', JSON.stringify(['toeic-1811']));
     });
     await page.getByRole('button', { name: /TOEIC Bridge対策/ }).click();
-    await page.waitForFunction(() => document.body.classList.contains('toeic-mode') && !document.getElementById('appShell').hidden);
+    await page.waitForFunction(() =>
+      document.body.classList.contains('toeic-mode') &&
+      !document.getElementById('appShell').hidden &&
+      WORD_DATA.words.length === 5049
+    );
     const words = await page.evaluate(() => WORD_DATA.words);
-    assert.equal(words.length, 5021);
-    assert.ok(words.every((word, index) => word.id === `toeic-${index + 1}` && word.rank === index + 1 && word.pos && word.headword && word.phonetic));
+    assert.equal(words.length, 5049);
+    assert.ok(words.slice(0, 5021).every((word, index) =>
+      word.id === `toeic-${index + 1}` && word.rank === index + 1 && word.pos && word.headword && word.phonetic
+    ));
+    const observed = words.slice(5021);
+    assert.equal(observed.length, 28);
+    assert.ok(observed.every(word => word.id.startsWith('toeic-observed-') && word.sourceCategory === 'observed' && !word.cefr && !word.rank));
     const expectedPerfect = ['toeic-2577', 'toeic-594', 'toeic-66'];
     assert.deepEqual(await page.evaluate(() => [...getMastery()].sort()), expectedPerfect);
     assert.deepEqual(await page.evaluate(() => [...getFlashcardStats().known].sort()), expectedPerfect);
     assert.deepEqual(await page.evaluate(() => [...getFlashcardStats().unknown]), ['toeic-1811']);
 
     await page.getByRole('button', { name: '全単語リスト', exact: true }).click();
-    assert.equal(await page.locator('#wordTableBody tr').count(), 5021);
+    assert.equal(await page.locator('#wordTableBody tr').count(), 5049);
     const rowFor = word => page.locator('#wordTableBody tr').filter({
       has: page.locator('.word-cell > div:first-child').filter({ hasText: new RegExp(`^${word}$`) }),
     });
@@ -48,6 +57,13 @@ async function main() {
     assert.match(fineMeanings[0], /元気|良い|よい|晴れ|細かい/);
     assert.match(fineMeanings[1], /罰金/);
 
+    await page.locator('#searchInput').fill('wireless');
+    const wirelessRow = page.locator('#wordTableBody tr').filter({ hasText: 'wireless' });
+    assert.equal(await wirelessRow.count(), 1);
+    assert.equal(await wirelessRow.locator('td').nth(2).innerText(), '実問題追加');
+    await wirelessRow.locator('.status-tag-perfect').click();
+    assert.equal(await page.evaluate(() => getWordStatus('toeic-observed-wireless')), 'perfect');
+
     await page.getByRole('button', { name: 'フラッシュカード', exact: true }).click();
     await page.evaluate(() => {
       state.flashcardOrder = [WORD_DATA.words.find(word => word.word === 'fine' && word.pos === 'adjective')];
@@ -58,6 +74,14 @@ async function main() {
     assert.ok(await page.locator('#flashcard').evaluate(element => element.classList.contains('card-flipped')));
     assert.match(await page.locator('#flashcardMeaning').innerText(), /元気|良い|よい|晴れ|細かい/);
     await page.getByRole('button', { name: '知っていた', exact: true }).click();
+
+    await page.evaluate(() => {
+      state.flashcardOrder = [WORD_DATA.words.find(word => word.id === 'toeic-observed-wireless')];
+      state.flashcardSeen = new Set();
+      state.flashcardIndex = 0;
+      showFlashcard();
+    });
+    assert.equal(await page.locator('#flashcardPage').innerText(), '実問題追加');
 
     await page.getByRole('button', { name: '4択クイズ', exact: true }).click();
     await page.evaluate(() => {
@@ -73,31 +97,53 @@ async function main() {
     assert.equal(await page.locator('#quizOptions .correct').count(), 1);
 
     await page.reload();
-    await page.waitForFunction(() => document.body.classList.contains('toeic-mode') && !document.getElementById('appShell').hidden);
+    await page.waitForFunction(() =>
+      document.body.classList.contains('toeic-mode') &&
+      !document.getElementById('appShell').hidden &&
+      WORD_DATA.words.length === 5049
+    );
     assert.equal(await page.evaluate(() => getMastery().has('toeic-66')), true);
     assert.equal(await page.evaluate(() => getMastery().has('toeic-2577')), true);
     assert.equal(await page.evaluate(() => getFlashcardStats().known.has('toeic-594')), true);
     assert.equal(await page.evaluate(() => getFlashcardStats().unknown.has('toeic-1811')), true);
+    assert.equal(await page.evaluate(() => getWordStatus('toeic-observed-wireless')), 'perfect');
 
     await page.getByRole('button', { name: '全単語リスト', exact: true }).click();
     await page.locator('#panel-list > .page-filter-btn').click();
+    const observedToggle = page.locator('#listPageGrid .toeic-observed-toggle');
+    assert.equal(await observedToggle.isChecked(), true);
+    await observedToggle.uncheck();
+    assert.equal(await page.evaluate(() => getFilteredWords('list').some(word => word.sourceCategory === 'observed')), false);
+    await observedToggle.check();
+    assert.equal(await page.evaluate(() => getFilteredWords('list').some(word => word.sourceCategory === 'observed')), true);
+
     await page.locator('#listPageGrid .toeic-priority-toggle[data-cefr="B1"]').first().uncheck();
     const filterBefore = await page.evaluate(() => localStorage.getItem('wordcard_toeic_list_cefr_priority_filter_v1'));
     assert.ok(filterBefore);
     await page.reload();
-    await page.waitForFunction(() => document.body.classList.contains('toeic-mode') && !document.getElementById('appShell').hidden);
+    await page.waitForFunction(() =>
+      document.body.classList.contains('toeic-mode') &&
+      !document.getElementById('appShell').hidden &&
+      WORD_DATA.words.length === 5049
+    );
     assert.equal(await page.evaluate(() => localStorage.getItem('wordcard_toeic_list_cefr_priority_filter_v1')), filterBefore);
     assert.equal(await page.evaluate(() => getFilteredWords('list').some(word => word.cefr === 'B1' && word.priority === 'S+')), false);
+    assert.equal(await page.evaluate(() => getFilteredWords('list').some(word => word.sourceCategory === 'observed')), true);
 
     await page.evaluate(() => navigator.serviceWorker.ready);
     await page.waitForFunction(() => navigator.serviceWorker.controller);
-    assert.ok((await page.evaluate(() => caches.keys())).includes('english-vocab-pwa-v11'));
+    assert.ok((await page.evaluate(() => caches.keys())).includes('english-vocab-pwa-v12'));
     await context.setOffline(true);
     await page.reload();
-    await page.waitForFunction(() => document.body.classList.contains('toeic-mode') && !document.getElementById('appShell').hidden);
+    await page.waitForFunction(() =>
+      document.body.classList.contains('toeic-mode') &&
+      !document.getElementById('appShell').hidden &&
+      WORD_DATA.words.length === 5049
+    );
     await page.locator('#searchInput').fill('fine');
     assert.deepEqual(await rowFor('fine').locator('td:nth-child(2)').allInnerTexts(), fineMeanings);
     assert.equal(await page.evaluate(() => getMastery().has('toeic-2577')), true);
+    assert.equal(await page.evaluate(() => getWordStatus('toeic-observed-wireless')), 'perfect');
     await context.setOffline(false);
 
     await page.getByRole('button', { name: 'ホーム', exact: true }).click();
@@ -106,7 +152,7 @@ async function main() {
     assert.equal(await page.evaluate(() => WORD_DATA.words.length), 498);
     assert.equal(await page.evaluate(() => document.body.classList.contains('toeic-mode')), false);
     assert.deepEqual(errors, []);
-    console.log(`Browser checks passed (${mobile ? 'mobile viewport' : 'desktop'}): 5021 rows, POS/IPA, corrected list/card/quiz, existing progress, reload, filters, offline, Kosen mode.`);
+    console.log(`Browser checks passed (${mobile ? 'mobile viewport' : 'desktop'}): 5049 rows including 28 observed items, POS/IPA, list/card/quiz, progress, filters, offline, Kosen mode.`);
   } finally {
     await browser.close();
   }
