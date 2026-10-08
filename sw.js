@@ -1,5 +1,5 @@
 const CACHE_PREFIX = 'english-vocab-pwa-';
-const CACHE_NAME = CACHE_PREFIX + 'v11';
+const CACHE_NAME = CACHE_PREFIX + 'v12';
 const APP_SHELL = [
   './',
   './index.html',
@@ -7,6 +7,8 @@ const APP_SHELL = [
   './learning-status.js',
   './app.js',
   './toeic-mode.js',
+  './toeic-observed.js',
+  './toeic-observed-integration.js',
   './toeic-data-1.js',
   './toeic-data-2.js',
   './toeic-data-3.js',
