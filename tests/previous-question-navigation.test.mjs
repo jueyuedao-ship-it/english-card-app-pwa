@@ -138,15 +138,17 @@ function createHarness(words) {
     WORD_DATA.words = ${JSON.stringify(words)};
     globalThis.testApi = {
       state,
-      initFlashcard,
-      markCard,
-      initQuiz,
       getStatus: getWordStatus,
     };
   `, context);
 
   assert.equal(existsSync(historyScriptPath), true, 'history-navigation.js should exist');
   vm.runInContext(readFileSync(historyScriptPath, 'utf8'), context, { filename: 'history-navigation.js' });
+  vm.runInContext(`
+    testApi.initFlashcard = initFlashcard;
+    testApi.markCard = markCard;
+    testApi.initQuiz = initQuiz;
+  `, context);
 
   const runTimers = () => {
     while (timers.length) timers.shift().fn();
