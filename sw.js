@@ -6,6 +6,7 @@ const APP_SHELL = [
   './styles.css',
   './learning-status.js',
   './app.js',
+  './history-navigation.js',
   './toeic-mode.js',
   './toeic-observed.js',
   './toeic-observed-integration.js',

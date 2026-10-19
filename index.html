@@ -88,6 +88,7 @@
     <div class="card-modes">
       <button class="btn btn-secondary shuffle-btn" id="shuffleBtn" onclick="toggleShuffle()">シャッフル</button>
       <button class="btn btn-secondary shuffle-btn" id="pageOrderBtn" onclick="togglePageOrder()">ページ順</button>
+      <button class="btn btn-secondary shuffle-btn" id="flashcardBackBtn" onclick="goBackFlashcard()" disabled>← 一つ前に戻る</button>
     </div>
     <div class="card-controls">
       <button class="btn btn-unknown" onclick="markCard(false)">知っていなかった</button>
@@ -119,6 +120,7 @@
     <button class="filter-btn" id="quizModeBtn" onclick="toggleQuizMode()">英→和</button>
     <button class="filter-btn" id="quizShuffleBtn" onclick="toggleQuizShuffle()">シャッフル</button>
     <button class="filter-btn" id="quizPageOrderBtn" onclick="toggleQuizPageOrder()">ページ順</button>
+    <button class="filter-btn" id="quizBackBtn" onclick="goBackQuiz()" disabled>← 一つ前に戻る</button>
   </div>
   <div class="quiz-area">
     <div class="quiz-score">正解: <span id="quizScore">0</span> / <span id="quizTotal">0</span></div>
@@ -167,6 +169,7 @@
 <script src="./toeic-observed.js"></script>
 <script src="./toeic-mode.js"></script>
 <script src="./toeic-observed-integration.js"></script>
+<script src="./history-navigation.js"></script>
 <script src="./pwa.js"></script>
 </body>
 </html>
