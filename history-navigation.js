@@ -1,20 +1,22 @@
 (() => {
   const history = {
-    flashcard: null,
-    quiz: null,
+    flashcard: [],
+    quiz: [],
   };
 
   function updateBackButtons() {
     const flashcardButton = document.getElementById('flashcardBackBtn');
     if (flashcardButton) {
-      flashcardButton.disabled = !history.flashcard || history.flashcard.studyMode !== state.studyMode;
+      const previous = history.flashcard[history.flashcard.length - 1];
+      flashcardButton.disabled = !previous || previous.studyMode !== state.studyMode;
     }
 
     const quizButton = document.getElementById('quizBackBtn');
     if (quizButton) {
-      quizButton.disabled = !history.quiz ||
-        history.quiz.studyMode !== state.studyMode ||
-        history.quiz.quizMode !== state.quizMode;
+      const previous = history.quiz[history.quiz.length - 1];
+      quizButton.disabled = !previous ||
+        previous.studyMode !== state.studyMode ||
+        previous.quizMode !== state.quizMode;
     }
   }
 
@@ -27,7 +29,7 @@
 
   const originalInitFlashcard = initFlashcard;
   initFlashcard = function() {
-    history.flashcard = null;
+    history.flashcard.length = 0;
     const result = originalInitFlashcard();
     updateBackButtons();
     return result;
@@ -35,7 +37,7 @@
 
   const originalToggleShuffle = toggleShuffle;
   toggleShuffle = function() {
-    history.flashcard = null;
+    history.flashcard.length = 0;
     const result = originalToggleShuffle();
     updateBackButtons();
     return result;
@@ -43,7 +45,7 @@
 
   const originalTogglePageOrder = togglePageOrder;
   togglePageOrder = function() {
-    history.flashcard = null;
+    history.flashcard.length = 0;
     const result = originalTogglePageOrder();
     updateBackButtons();
     return result;
@@ -54,13 +56,13 @@
     const word = state.flashcardOrder[0];
     if (!word) return originalMarkCard(known);
 
-    history.flashcard = {
+    history.flashcard.push({
       studyMode: state.studyMode,
       wordKey: getWordIdentity(word),
       previousStatus: getWordStatus(word),
       order: [...state.flashcardOrder],
       seen: new Set(state.flashcardSeen),
-    };
+    });
 
     const result = originalMarkCard(known);
     updateBackButtons();
@@ -68,10 +70,10 @@
   };
 
   function goBackFlashcard() {
-    const previous = history.flashcard;
+    const previous = history.flashcard[history.flashcard.length - 1];
     if (!previous || previous.studyMode !== state.studyMode) return;
 
-    history.flashcard = null;
+    history.flashcard.pop();
     setWordStatus(previous.wordKey, previous.previousStatus);
     state.flashcardOrder = [...previous.order];
     state.flashcardSeen = new Set(previous.seen);
@@ -84,7 +86,7 @@
 
   const originalInitQuiz = initQuiz;
   initQuiz = function() {
-    history.quiz = null;
+    history.quiz.length = 0;
     const result = originalInitQuiz();
     updateBackButtons();
     return result;
@@ -107,7 +109,7 @@
       getWordIdentity(word) === wordKey;
 
     if (accepted) {
-      history.quiz = {
+      history.quiz.push({
         studyMode: state.studyMode,
         quizMode: state.quizMode,
         wordKey,
@@ -119,7 +121,7 @@
         question: document.getElementById('quizWord').textContent,
         options: [...document.querySelectorAll('#quizOptions .quiz-option')].map(button => button.textContent),
         correct,
-      };
+      });
     }
 
     const result = originalCheckQuiz(btn, selected, correct, token, wordKey, mode);
@@ -155,12 +157,12 @@
   }
 
   function goBackQuiz() {
-    const previous = history.quiz;
+    const previous = history.quiz[history.quiz.length - 1];
     if (!previous ||
       previous.studyMode !== state.studyMode ||
       previous.quizMode !== state.quizMode) return;
 
-    history.quiz = null;
+    history.quiz.pop();
     setWordStatus(previous.wordKey, previous.previousStatus);
     state.quizOrder = [...previous.order];
     state.quizSeen = new Set(previous.seen);
